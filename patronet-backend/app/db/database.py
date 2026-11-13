@@ -1,5 +1,5 @@
-
 from sqlalchemy import URL, create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
@@ -14,6 +14,16 @@ database_url = URL.create(
 )
 
 engine = create_engine(database_url, pool_pre_ping=True)
+
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def test_database_connection():
