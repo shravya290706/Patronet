@@ -4,8 +4,11 @@ and carry the expected constraints and relationships.
 No data is written to the Aiven database.
 """
 
+import os
+
+import pytest
+
 from app.db.base import Base
-from app.db.database import engine
 from app.models import (
     Address,
     Cart,
@@ -128,8 +131,16 @@ def test_foreign_key_relationships():
     print("PASS: all foreign key relationships present")
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.getenv("PATRONET_RUN_AIVEN_INTEGRATION_TESTS") != "1",
+    reason="Set PATRONET_RUN_AIVEN_INTEGRATION_TESTS=1 to run Aiven smoke tests",
+)
 def test_database_connectivity():
     from sqlalchemy import text
+
+    from app.db.database import engine
+
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version()")).scalar()
     assert "PostgreSQL" in version
@@ -142,5 +153,6 @@ if __name__ == "__main__":
     test_unique_constraints()
     test_check_constraints()
     test_foreign_key_relationships()
-    test_database_connectivity()
+    if os.getenv("PATRONET_RUN_AIVEN_INTEGRATION_TESTS") == "1":
+        test_database_connectivity()
     print("\nAll model tests passed.")

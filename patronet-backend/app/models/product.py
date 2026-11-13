@@ -1,6 +1,19 @@
 from datetime import datetime, timezone
+from typing import Any
 
-from sqlalchemy import UUID, Boolean, CheckConstraint, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import (
+    JSON,
+    UUID,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, uuid_pk
@@ -16,6 +29,12 @@ class Product(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    specifications: Mapped[dict[str, Any]] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'"),
+    )
     brand: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     sku: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     price: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)

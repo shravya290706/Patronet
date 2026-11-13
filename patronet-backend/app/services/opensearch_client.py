@@ -1,4 +1,6 @@
 
+from collections.abc import Iterator
+
 from opensearchpy import OpenSearch
 
 from app.core.config import settings
@@ -19,6 +21,14 @@ def create_opensearch_client():
         use_ssl=settings.OPENSEARCH_USE_SSL,
         verify_certs=True,
     )
+
+
+def get_opensearch_client() -> Iterator[OpenSearch]:
+    client = create_opensearch_client()
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 def test_opensearch_connection():

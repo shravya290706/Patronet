@@ -16,6 +16,12 @@ class Settings:
     APP_ENV: str = os.getenv("APP_ENV", "development")
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
 
+    # Authentication
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+        os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+    )
+
     # PostgreSQL
     POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "")
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
@@ -34,9 +40,13 @@ class Settings:
     KAFKA_SASL_MECHANISM: str = os.getenv(
         "KAFKA_SASL_MECHANISM", "PLAIN"
     )
-    KAFKA_CA_LOCATION: str = str(
-    PROJECT_ROOT / "patronet-backend" / "certs" / "ca.pem"
-)
+    KAFKA_CA_LOCATION: str = os.getenv("KAFKA_CA_LOCATION") or str(
+        PROJECT_ROOT / "patronet-backend" / "certs" / "ca.pem"
+    )
+    KAFKA_ORDER_EVENTS_TOPIC: str = os.getenv("KAFKA_ORDER_EVENTS_TOPIC", "")
+    KAFKA_ORDER_EVENTS_CONSUMER_GROUP: str = os.getenv(
+        "KAFKA_ORDER_EVENTS_CONSUMER_GROUP", ""
+    )
 
     # OpenSearch
     OPENSEARCH_HOST: str = os.getenv("OPENSEARCH_HOST", "")

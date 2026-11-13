@@ -8,6 +8,7 @@ click==8.5.1
 colorama==0.4.6
 confluent-kafka==2.16.1
 Events==0.5
+email-validator==2.2.0
 fastapi==0.162.5
 grpcio==1.85.1
 h11==0.16.0
@@ -26,8 +27,10 @@ opentelemetry-api==1.45.2
 packaging==26.3
 pluggy==1.7.0
 protobuf==7.36.2
+PyJWT==2.10.1
 psycopg==3.3.9
 psycopg-binary==3.3.9
+pwdlib[argon2]==0.3.0
 pydantic==2.14.3
 pydantic_core==2.50.4
 Pygments==2.21.0

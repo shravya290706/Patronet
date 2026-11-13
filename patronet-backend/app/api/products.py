@@ -1,7 +1,10 @@
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from opensearchpy import OpenSearch
+from opensearchpy.exceptions import NotFoundError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,7 +16,16 @@ from app.schemas.product import (
     CategoryOut,
     PaginatedProducts,
     ProductDetail,
+    ProductSearchResponse,
     ProductSummary,
+)
+from app.services.opensearch_client import get_opensearch_client
+from app.services.product_search import (
+    MAX_RESULT_WINDOW,
+    SearchSort,
+)
+from app.services.product_search import (
+    search_products as run_product_search,
 )
 
 router = APIRouter(prefix="/api", tags=["products"])
@@ -84,6 +96,47 @@ def list_products(
         results.append(summary)
 
     return PaginatedProducts(total=total, page=page, page_size=page_size, results=results)
+
+
+@router.get("/products/search", response_model=ProductSearchResponse)
+def search_products_endpoint(
+    q: str | None = Query(None, max_length=200, description="Typo-tolerant search text"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Results per page"),
+    category_id: UUID | None = Query(None, description="Filter by category UUID"),  # noqa: B008
+    brand: str | None = Query(None, max_length=100, description="Case-insensitive brand filter"),
+    min_price: Decimal | None = Query(None, ge=0, description="Minimum price"),  # noqa: B008
+    max_price: Decimal | None = Query(None, ge=0, description="Maximum price"),  # noqa: B008
+    city: str | None = Query(None, max_length=100, description="Only products in stock in this city"),
+    sort: SearchSort = Query("relevance", description="Search relevance, price, or newest order"),  # noqa: B008
+    client: OpenSearch = Depends(get_opensearch_client),  # noqa: B008
+):
+    if min_price is not None and max_price is not None and max_price < min_price:
+        raise HTTPException(status_code=422, detail="max_price must be >= min_price")
+    if (page - 1) * page_size + page_size > MAX_RESULT_WINDOW:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Requested page exceeds the search result window of {MAX_RESULT_WINDOW}",
+        )
+
+    try:
+        return run_product_search(
+            client,
+            query=q,
+            page=page,
+            page_size=page_size,
+            category_id=str(category_id) if category_id is not None else None,
+            brand=brand,
+            min_price=min_price,
+            max_price=max_price,
+            city=city,
+            sort=sort,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Product search index is not initialized; rebuild it from PostgreSQL.",
+        ) from error
 
 
 @router.get("/products/{product_id}", response_model=ProductDetail)
