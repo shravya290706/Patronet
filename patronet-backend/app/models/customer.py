@@ -22,3 +22,4 @@ class Customer(Base):
     addresses: Mapped[list["Address"]] = relationship("Address", back_populates="customer")
     carts: Mapped[list["Cart"]] = relationship("Cart", back_populates="customer")
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="customer")
+    wishlist_items: Mapped[list["WishlistItem"]] = relationship("WishlistItem", back_populates="customer")

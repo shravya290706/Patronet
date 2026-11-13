@@ -1,24 +1,32 @@
 /**
- * Search Service Integration Hook
- * Isolated mock search architecture ready for future OpenSearch API integration.
+ * Search Service
+ * Connects to GET /api/products/search (OpenSearch-backed).
+ * Autocomplete suggestions combine OpenSearch product results with catalogue categories.
  */
 
+import { apiClient } from "./api.client"
+import { normalizeApiError } from "./api.errors"
+import { getUiCategories } from "./category.service"
+import type { ApiSearchResponse, ApiSearchSortOption } from "@/types/api.types"
 import type { UiPaginatedList, UiProductCardModel } from "@/types/ui.types"
-import {
-  type SearchSuggestionItem,
-  queryMockSuggestions,
-  queryMockSearchResults,
-} from "@/mocks/search.mock"
+import { mapApiProductToCard } from "./mappers/product.mapper"
+import type { SearchSuggestionItem } from "@/mocks/search.mock"
 
 export interface SearchQueryParams {
   query: string
   page?: number
   pageSize?: number
+  categoryId?: string
+  brand?: string
+  minPrice?: number
+  maxPrice?: number
+  city?: string
+  sort?: ApiSearchSortOption
 }
 
 /**
- * Searches products using query parameters.
- * When backend OpenSearch endpoint is exposed, this function can connect to apiClient.
+ * Searches products via GET /api/products/search (OpenSearch).
+ * Returns an empty page only for an empty query; API failures are surfaced to the caller.
  */
 export async function searchProducts(
   params: SearchQueryParams
@@ -27,35 +35,49 @@ export async function searchProducts(
   const trimmed = query.trim()
 
   if (!trimmed) {
-    return {
-      items: [],
-      total: 0,
-      page: 1,
-      pageSize,
-      totalPages: 1,
-      hasMore: false,
-    }
+    return { items: [], total: 0, page: 1, pageSize, totalPages: 1, hasMore: false }
   }
 
-  // Use isolated mock search results
-  const matching = queryMockSearchResults(trimmed)
-  const total = matching.length
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const start = (page - 1) * pageSize
-  const items = matching.slice(start, start + pageSize)
-
-  return {
-    items,
-    total,
+  const cleanParams: Record<string, string | number | undefined> = {
+    q: trimmed,
     page,
-    pageSize,
-    totalPages,
-    hasMore: page < totalPages,
+    page_size: pageSize,
+    category_id: params.categoryId,
+    brand: params.brand,
+    min_price: params.minPrice,
+    max_price: params.maxPrice,
+    city: params.city,
+    sort: params.sort ?? "relevance",
+  }
+
+  try {
+    const data = await apiClient<ApiSearchResponse>("/api/products/search", {
+      params: cleanParams,
+    })
+
+    const totalPages = Math.max(1, Math.ceil(data.total / pageSize))
+    return {
+      items: (data.results ?? []).map(mapApiProductToCard),
+      total: data.total,
+      page: data.page,
+      pageSize: data.page_size,
+      totalPages,
+      hasMore: data.page < totalPages,
+    }
+  } catch (rawError) {
+    const err = normalizeApiError(rawError)
+    // 503 means OpenSearch index not initialized — surface as empty with message
+    if (err.status === 503) {
+      throw new Error(
+        "Product search index is not yet initialized. Run the index rebuild script and try again."
+      )
+    }
+    throw err
   }
 }
 
 /**
- * Retrieves search suggestions for auto-complete.
+ * Retrieves product suggestions from OpenSearch and matching category/brand suggestions.
  */
 export async function getSearchSuggestions(
   query: string
@@ -63,6 +85,47 @@ export async function getSearchSuggestions(
   const trimmed = query.trim()
   if (!trimmed) return []
 
-  // Simulated instant lookup from mock suggestions
-  return queryMockSuggestions(trimmed)
+  const [products, categories] = await Promise.all([
+    searchProducts({ query: trimmed, page: 1, pageSize: 5 }),
+    getUiCategories(),
+  ])
+  const productSuggestions: SearchSuggestionItem[] = products.items.map(
+    (product) => ({
+      id: `product:${product.id}`,
+      targetId: product.id,
+      title: product.name,
+      type: "product",
+      subtitle: product.categoryName,
+      price: product.price,
+      sku: product.sku,
+      imageUrl: product.imageUrl,
+    })
+  )
+  const matchingCategories: SearchSuggestionItem[] = categories
+    .filter((category) =>
+      category.name.toLocaleLowerCase().includes(trimmed.toLocaleLowerCase())
+    )
+    .slice(0, 3)
+    .map((category) => ({
+      id: `category:${category.id}`,
+      targetId: category.id,
+      title: category.name,
+      type: "category",
+      subtitle: category.description,
+    }))
+  const matchingBrands: SearchSuggestionItem[] = Array.from(
+    new Set(products.items.map((product) => product.brand).filter(Boolean))
+  )
+    .slice(0, 3)
+    .map((brand) => ({
+      id: `brand:${brand}`,
+      title: brand ?? "",
+      type: "brand",
+    }))
+
+  return [
+    ...productSuggestions,
+    ...matchingCategories,
+    ...matchingBrands,
+  ].slice(0, 10)
 }

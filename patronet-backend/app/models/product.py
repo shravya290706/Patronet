@@ -49,3 +49,4 @@ class Product(Base):
     inventory: Mapped[list["Inventory"]] = relationship("Inventory", back_populates="product")
     cart_items: Mapped[list["CartItem"]] = relationship("CartItem", back_populates="product")
     order_items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="product")
+    wishlist_items: Mapped[list["WishlistItem"]] = relationship("WishlistItem", back_populates="product")

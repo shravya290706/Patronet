@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowRight, Mail } from "lucide-react"
 import { Container } from "@/components/layout/Container"
 import { HeroSection } from "@/components/layout/HeroSection"
@@ -11,35 +11,70 @@ import { ProductGrid } from "@/components/products/ProductGrid"
 
 import { mockHomepageCategories } from "@/mocks/categories.mock"
 import { mockFeaturedProducts, mockNewArrivals } from "@/mocks/products.mock"
+import { getUiCategories } from "@/services/category.service"
+import { getUiProducts } from "@/services/product.service"
+import type { UiCategoryModel, UiProductCardModel } from "@/types/ui.types"
 
 interface HomePageProps {
   onProductClick?: (productId: string) => void
   onCategoryClick?: (categoryId: string) => void
-  onAddToCart?: (productId: string) => void
+  onAddToCart?: (productId: string) => void | Promise<void>
+  onToggleWishlist?: (productId: string) => void | Promise<void>
+  wishlistedProductIds?: ReadonlySet<string>
 }
 
 export function HomePage({
   onProductClick,
   onCategoryClick,
   onAddToCart,
+  onToggleWishlist,
+  wishlistedProductIds,
 }: HomePageProps) {
-  // Client-only tab display switcher (does not imply backend filtering or ranking)
   const [activeFilterTab, setActiveFilterTab] = useState<"all" | "audio" | "computing">("all")
   const [newsletterEmail, setNewsletterEmail] = useState("")
+  const [newsletterMessage, setNewsletterMessage] = useState<string | null>(null)
 
-  // Filter presentation strictly over mock display data
+  // Real data from API with mock fallbacks
+  const [categories, setCategories] = useState<UiCategoryModel[]>(mockHomepageCategories)
+  const [featuredProducts, setFeaturedProducts] = useState<UiProductCardModel[]>(mockFeaturedProducts)
+  const [newArrivals, setNewArrivals] = useState<UiProductCardModel[]>(mockNewArrivals)
+
+  useEffect(() => {
+    getUiCategories()
+      .then((data) => { if (data.length > 0) setCategories(data) })
+      .catch(() => { /* keep mock fallback */ })
+  }, [])
+
+  useEffect(() => {
+    getUiProducts({ page: 1, page_size: 8, sort: "price_desc" })
+      .then((data) => { if (data.items.length > 0) setFeaturedProducts(data.items) })
+      .catch(() => { /* keep mock fallback */ })
+  }, [])
+
+  useEffect(() => {
+    getUiProducts({ page: 1, page_size: 8, sort: "newest" })
+      .then((data) => { if (data.items.length > 0) setNewArrivals(data.items) })
+      .catch(() => { /* keep mock fallback */ })
+  }, [])
+
+  // Client-side tab filter over real data
   const displayedFeaturedProducts = activeFilterTab === "all"
-    ? mockFeaturedProducts
-    : mockFeaturedProducts.filter((p) => {
-        if (activeFilterTab === "audio") return p.categoryName?.includes("Audio")
-        if (activeFilterTab === "computing") return p.categoryName?.includes("Computing") || p.categoryName?.includes("Wearables")
+    ? featuredProducts
+    : featuredProducts.filter((p) => {
+        if (activeFilterTab === "audio") return p.categoryName?.toLowerCase().includes("audio")
+        if (activeFilterTab === "computing") return (
+          p.categoryName?.toLowerCase().includes("computing") ||
+          p.categoryName?.toLowerCase().includes("wearable") ||
+          p.categoryName?.toLowerCase().includes("laptop") ||
+          p.categoryName?.toLowerCase().includes("keyboard") ||
+          p.categoryName?.toLowerCase().includes("mouse")
+        )
         return true
       })
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Honest placeholder notice: No backend subscription endpoint exists yet
-    alert("Newsletter subscription is a demonstration placeholder. No subscription endpoint is currently configured.")
+    setNewsletterMessage("Newsletter signup is not connected, so your email was not submitted.")
   }
 
   return (
@@ -50,7 +85,7 @@ export function HomePage({
           {/* Left Column: Category Navigator Aside (4 cols on lg) */}
           <div className="lg:col-span-4 w-full">
             <CategoryAsideNav
-              categories={mockHomepageCategories}
+              categories={categories}
               onCategorySelect={onCategoryClick}
             />
           </div>
@@ -84,7 +119,7 @@ export function HomePage({
           />
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-space-md">
-            {mockHomepageCategories.map((category) => (
+            {categories.map((category) => (
               <CategoryCard
                 key={category.id}
                 category={category}
@@ -108,7 +143,7 @@ export function HomePage({
               </p>
             </div>
 
-            {/* Filter Toggle Pills (Presentation Filter: All / Audio / Computing) */}
+            {/* Filter Toggle Pills */}
             <div className="flex items-center gap-1.5 p-1 bg-surface-container rounded-full overflow-x-auto">
               <button
                 type="button"
@@ -153,6 +188,8 @@ export function HomePage({
                 product={product}
                 onViewDetails={onProductClick}
                 onAddToCart={onAddToCart}
+                onToggleWishlist={onToggleWishlist}
+                isWishlisted={wishlistedProductIds?.has(product.id)}
               />
             ))}
           </ProductGrid>
@@ -189,12 +226,14 @@ export function HomePage({
           />
 
           <ProductGrid columns={4}>
-            {mockNewArrivals.map((product) => (
+            {newArrivals.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 onViewDetails={onProductClick}
                 onAddToCart={onAddToCart}
+                onToggleWishlist={onToggleWishlist}
+                isWishlisted={wishlistedProductIds?.has(product.id)}
               />
             ))}
           </ProductGrid>
@@ -223,7 +262,10 @@ export function HomePage({
                 type="email"
                 required
                 value={newsletterEmail}
-                onChange={(e) => setNewsletterEmail(e.target.value)}
+                onChange={(e) => {
+                  setNewsletterEmail(e.target.value)
+                  setNewsletterMessage(null)
+                }}
                 placeholder="Enter your email..."
                 className="flex-1 px-space-md py-2.5 rounded-lg bg-surface-container-low border border-surface-container-highest text-on-surface placeholder:text-outline font-body-md text-body-md focus:outline-none focus:border-primary"
               />
@@ -234,6 +276,11 @@ export function HomePage({
                 Subscribe
               </button>
             </form>
+            {newsletterMessage && (
+              <p role="status" className="mt-2 text-body-sm text-on-surface-variant">
+                {newsletterMessage}
+              </p>
+            )}
           </div>
         </section>
       </Container>

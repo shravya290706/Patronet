@@ -12,7 +12,11 @@ import {
 import { Container } from "@/components/layout"
 import { Breadcrumbs, type BreadcrumbItem, Pagination } from "@/components/ui"
 import { ProductCard, ProductGrid, FilterSidebar, type FilterState } from "@/components/products"
-import { getUiProducts } from "@/services/product.service"
+import {
+  getProductBrands,
+  getUiProducts,
+  isBackendUuid,
+} from "@/services/product.service"
 import { getUiCategories } from "@/services/category.service"
 import { normalizeApiError } from "@/services/api.errors"
 import { mockCatalogProducts } from "@/mocks/products.mock"
@@ -23,13 +27,16 @@ import type { ApiProductSortOption } from "@/types/api.types"
 export interface ProductListingPageProps {
   initialCategoryId?: string
   initialBrand?: string
+  initialSort?: ApiProductSortOption
   onProductClick?: (id: string) => void
-  onAddToCart?: (id: string) => void
+  onAddToCart?: (id: string) => void | Promise<void>
+  onToggleWishlist?: (id: string) => void | Promise<void>
+  wishlistedProductIds?: ReadonlySet<string>
   onNavigateHome?: () => void
 }
 
-// Extract distinct brand list from centralized mock catalog
-const allUniqueBrands = Array.from(
+// Mock brand list used only as dev fallback when API is unreachable
+const MOCK_BRANDS = Array.from(
   new Set(mockCatalogProducts.map((p) => p.brand).filter((b): b is string => Boolean(b)))
 ).sort()
 
@@ -38,13 +45,16 @@ const PAGE_SIZE = 16
 export function ProductListingPage({
   initialCategoryId,
   initialBrand,
+  initialSort = "newest",
   onProductClick,
   onAddToCart,
+  onToggleWishlist,
+  wishlistedProductIds,
   onNavigateHome,
 }: ProductListingPageProps) {
   // Query parameters state
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [sortOption, setSortOption] = useState<ApiProductSortOption>("newest")
+  const [sortOption, setSortOption] = useState<ApiProductSortOption>(initialSort)
   const [filters, setFilters] = useState<FilterState>({
     categoryId: initialCategoryId,
     brand: initialBrand,
@@ -58,6 +68,10 @@ export function ProductListingPage({
   // Categories state
   const [categories, setCategories] = useState<UiCategoryModel[]>(mockHomepageCategories)
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(false)
+
+  // Brand list derived from loaded products (real data) or mock fallback
+  const [availableBrands, setAvailableBrands] = useState<string[]>(MOCK_BRANDS)
+  const [brandLoadError, setBrandLoadError] = useState<string | null>(null)
 
   // Products UI state
   const [products, setProducts] = useState<UiProductCardModel[]>([])
@@ -97,6 +111,25 @@ export function ProductListingPage({
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    let isMounted = true
+    getProductBrands()
+      .then((brands) => {
+        if (isMounted) {
+          setAvailableBrands(brands)
+          setBrandLoadError(null)
+        }
+      })
+      .catch((error: unknown) => {
+        if (isMounted) {
+          setBrandLoadError(normalizeApiError(error).message)
+        }
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     let isCancelled = false
 
     async function executeLoad() {
@@ -106,7 +139,9 @@ export function ProductListingPage({
       const queryParams = {
         page: currentPage,
         page_size: PAGE_SIZE,
-        category_id: filters.categoryId,
+        category_id: isBackendUuid(filters.categoryId)
+          ? filters.categoryId
+          : undefined,
         brand: filters.brand,
         min_price: filters.minPrice,
         max_price: filters.maxPrice,
@@ -395,8 +430,10 @@ export function ProductListingPage({
             {/* 1. Desktop Left Filter Sidebar */}
             <div className="hidden lg:block lg:col-span-3 sticky top-[136px]">
               <FilterSidebar
+                key={`${filters.minPrice ?? ""}:${filters.maxPrice ?? ""}`}
                 categories={categories}
-                availableBrands={allUniqueBrands}
+                availableBrands={availableBrands}
+                brandLoadError={brandLoadError}
                 filters={filters}
                 onFilterChange={handleFilterChange}
                 onResetFilters={handleResetFilters}
@@ -549,6 +586,8 @@ export function ProductListingPage({
                         product={product}
                         onViewDetails={onProductClick}
                         onAddToCart={onAddToCart}
+                        onToggleWishlist={onToggleWishlist}
+                        isWishlisted={wishlistedProductIds?.has(product.id)}
                       />
                     ))}
                   </ProductGrid>
@@ -601,8 +640,10 @@ export function ProductListingPage({
               </div>
 
               <FilterSidebar
+                key={`${filters.minPrice ?? ""}:${filters.maxPrice ?? ""}`}
                 categories={categories}
-                availableBrands={allUniqueBrands}
+                availableBrands={availableBrands}
+                brandLoadError={brandLoadError}
                 filters={filters}
                 onFilterChange={handleFilterChange}
                 onResetFilters={handleResetFilters}

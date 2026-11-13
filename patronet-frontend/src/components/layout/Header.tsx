@@ -11,6 +11,12 @@ interface HeaderProps {
   onSearchSubmit?: (query: string) => void
   onSuggestionClick?: (suggestion: SearchSuggestionItem) => void
   onCategorySelect?: (categoryId: string) => void
+  onLocationClick?: () => void
+  isAuthenticated?: boolean
+  customerName?: string
+  cartCount?: number
+  wishlistCount?: number
+  onLogout?: () => void
   currentLocation?: string
   className?: string
 }
@@ -19,10 +25,17 @@ export function Header({
   onSearchSubmit,
   onSuggestionClick,
   onCategorySelect,
+  onLocationClick,
+  isAuthenticated = false,
+  customerName,
+  cartCount = 0,
+  wishlistCount = 0,
+  onLogout,
   currentLocation,
   className,
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
 
   const handleSearchSubmit = (query: string) => {
     if (onSearchSubmit) {
@@ -78,10 +91,15 @@ export function Header({
           {/* Wishlist Link/Trigger */}
           <a
             href="#wishlist"
-            aria-label="Wishlist"
+            aria-label={wishlistCount > 0 ? `Wishlist (${wishlistCount} items)` : "Wishlist"}
             className="relative p-2 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded-full"
           >
             <Heart className="h-5 w-5" />
+            {wishlistCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-on-primary">
+                {wishlistCount > 99 ? "99+" : wishlistCount}
+              </span>
+            )}
           </a>
 
           {/* Cart Link/Trigger */}
@@ -91,22 +109,48 @@ export function Header({
             className="relative p-2 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded-full"
           >
             <ShoppingBag className="h-5 w-5" />
+            {cartCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-on-primary">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
           </a>
 
           {/* Account Profile Entry */}
-          <a
-            href="#login"
-            className="flex items-center gap-1 cursor-pointer pl-space-xs text-on-surface-variant hover:text-on-surface select-none group"
-            aria-label="User Account"
-          >
-            <div className="relative">
-              <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-outline group-hover:text-primary transition-colors overflow-hidden">
-                <User className="h-4 w-4" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              className="flex items-center gap-1 cursor-pointer pl-space-xs text-on-surface-variant hover:text-on-surface select-none group"
+              aria-label="User Account"
+              aria-expanded={accountMenuOpen}
+            >
+              <div className="relative">
+                <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-outline group-hover:text-primary transition-colors overflow-hidden">
+                  <User className="h-4 w-4" />
+                </div>
+                {isAuthenticated && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-secondary-container ring-1 ring-surface-container-lowest" />}
               </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-secondary-container ring-1 ring-surface-container-lowest" />
-            </div>
-            <ChevronDown className="h-4 w-4 text-outline group-hover:text-on-surface transition-colors hidden sm:inline" />
-          </a>
+              <span className="hidden max-w-24 truncate text-label-sm sm:inline">{customerName || (isAuthenticated ? "Account" : "Sign in")}</span>
+              <ChevronDown className="h-4 w-4 text-outline group-hover:text-on-surface transition-colors hidden sm:inline" />
+            </button>
+            {accountMenuOpen && (
+              <div className="absolute right-0 top-full z-[60] mt-2 w-48 rounded-xl border border-surface-container bg-surface-container-lowest p-2 shadow-lg">
+                {isAuthenticated ? (
+                  <>
+                    <a href="#orders" onClick={() => setAccountMenuOpen(false)} className="block rounded-lg px-3 py-2 text-body-sm hover:bg-surface-container-low">Your orders</a>
+                    <a href="#addresses" onClick={() => setAccountMenuOpen(false)} className="block rounded-lg px-3 py-2 text-body-sm hover:bg-surface-container-low">Addresses</a>
+                    <button type="button" onClick={() => { setAccountMenuOpen(false); onLogout?.() }} className="w-full rounded-lg px-3 py-2 text-left text-body-sm text-error hover:bg-error-container">Sign out</button>
+                  </>
+                ) : (
+                  <>
+                    <a href="#login" onClick={() => setAccountMenuOpen(false)} className="block rounded-lg px-3 py-2 text-body-sm hover:bg-surface-container-low">Sign in</a>
+                    <a href="#register" onClick={() => setAccountMenuOpen(false)} className="block rounded-lg px-3 py-2 text-body-sm hover:bg-surface-container-low">Create account</a>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </Container>
 
@@ -126,6 +170,7 @@ export function Header({
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={() => setMobileMenuOpen(false)}
         onCategorySelect={onCategorySelect}
+        onLocationClick={onLocationClick}
       />
     </header>
   )

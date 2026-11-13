@@ -11,6 +11,12 @@ interface MainLayoutProps {
   onSearchSubmit?: (query: string) => void
   onSuggestionClick?: (suggestion: SearchSuggestionItem) => void
   onCategorySelect?: (categoryId: string) => void
+  onLocationClick?: () => void
+  isAuthenticated?: boolean
+  customerName?: string
+  cartCount?: number
+  wishlistCount?: number
+  onLogout?: () => void
 }
 
 export function MainLayout({
@@ -20,6 +26,12 @@ export function MainLayout({
   onSearchSubmit,
   onSuggestionClick,
   onCategorySelect,
+  onLocationClick,
+  isAuthenticated,
+  customerName,
+  cartCount,
+  wishlistCount,
+  onLogout,
 }: MainLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col bg-surface text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
@@ -29,6 +41,12 @@ export function MainLayout({
         onSearchSubmit={onSearchSubmit}
         onSuggestionClick={onSuggestionClick}
         onCategorySelect={onCategorySelect}
+        onLocationClick={onLocationClick}
+        isAuthenticated={isAuthenticated}
+        customerName={customerName}
+        cartCount={cartCount}
+        wishlistCount={wishlistCount}
+        onLogout={onLogout}
       />
 
       {/* Main Content Area */}

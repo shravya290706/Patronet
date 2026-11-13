@@ -28,9 +28,9 @@ export function Footer({ className }: FooterProps) {
               Unified Retail E-Commerce Marketplace connecting customers with verified sellers and nationwide fulfillment.
             </p>
             <div className="flex items-center gap-space-sm pt-space-xs text-on-surface-variant">
-              <Globe className="h-4 w-4 hover:text-primary cursor-pointer transition-colors" />
-              <MessagesSquare className="h-4 w-4 hover:text-primary cursor-pointer transition-colors" />
-              <Rss className="h-4 w-4 hover:text-primary cursor-pointer transition-colors" />
+              <Globe className="h-4 w-4 text-outline" aria-hidden="true" />
+              <MessagesSquare className="h-4 w-4 text-outline" aria-hidden="true" />
+              <Rss className="h-4 w-4 text-outline" aria-hidden="true" />
             </div>
             <p className="font-label-sm text-label-sm text-outline">
               &copy; {new Date().getFullYear()} PATRONET. All rights reserved.
@@ -44,27 +44,27 @@ export function Footer({ className }: FooterProps) {
             </h3>
             <ul className="space-y-space-xs font-body-md text-body-md text-on-surface-variant">
               <li>
-                <a href="#about" className="hover:text-primary transition-colors">
+                <a href="#info/about" className="hover:text-primary transition-colors">
                   About Us
                 </a>
               </li>
               <li>
-                <a href="#careers" className="hover:text-primary transition-colors">
+                <a href="#info/careers" className="hover:text-primary transition-colors">
                   Careers
                 </a>
               </li>
               <li>
-                <a href="#press" className="hover:text-primary transition-colors">
+                <a href="#info/press" className="hover:text-primary transition-colors">
                   Press &amp; Media
                 </a>
               </li>
               <li>
-                <a href="#science" className="hover:text-primary transition-colors">
+                <a href="#info/patronet-science" className="hover:text-primary transition-colors">
                   Patronet Science
                 </a>
               </li>
               <li>
-                <a href="#investors" className="hover:text-primary transition-colors">
+                <a href="#info/investors" className="hover:text-primary transition-colors">
                   Investor Relations
                 </a>
               </li>
@@ -78,27 +78,27 @@ export function Footer({ className }: FooterProps) {
             </h3>
             <ul className="space-y-space-xs font-body-md text-body-md text-on-surface-variant">
               <li>
-                <a href="#help" className="hover:text-primary transition-colors">
+                <a href="#info/help-center" className="hover:text-primary transition-colors">
                   Help Center
                 </a>
               </li>
               <li>
-                <a href="#track-order" className="hover:text-primary transition-colors">
+                <a href="#orders" className="hover:text-primary transition-colors">
                   Track Order
                 </a>
               </li>
               <li>
-                <a href="#shipping" className="hover:text-primary transition-colors">
+                <a href="#info/shipping" className="hover:text-primary transition-colors">
                   Shipping &amp; Delivery
                 </a>
               </li>
               <li>
-                <a href="#returns" className="hover:text-primary transition-colors">
+                <a href="#info/returns" className="hover:text-primary transition-colors">
                   Returns &amp; Replacements
                 </a>
               </li>
               <li>
-                <a href="#cancellation" className="hover:text-primary transition-colors">
+                <a href="#info/order-cancellation" className="hover:text-primary transition-colors">
                   Order Cancellation
                 </a>
               </li>
@@ -113,15 +113,15 @@ export function Footer({ className }: FooterProps) {
             <ul className="space-y-space-xs font-body-md text-body-md text-on-surface-variant">
               <li className="flex items-center gap-space-xs">
                 <Mail className="h-4 w-4 text-outline flex-shrink-0" />
-                <a href="#contact" className="hover:text-primary transition-colors">Contact Support</a>
+                <a href="#info/contact-support" className="hover:text-primary transition-colors">Contact Support</a>
               </li>
               <li className="flex items-center gap-space-xs">
                 <Phone className="h-4 w-4 text-outline flex-shrink-0" />
-                <a href="#help" className="hover:text-primary transition-colors">Customer Care Helpline</a>
+                <a href="#info/customer-care" className="hover:text-primary transition-colors">Customer Care Helpline</a>
               </li>
               <li className="flex items-center gap-space-xs">
                 <MessageSquare className="h-4 w-4 text-outline flex-shrink-0" />
-                <a href="#chat" className="hover:text-primary transition-colors">Help Assistant</a>
+                <a href="#info/help-assistant" className="hover:text-primary transition-colors">Help Assistant</a>
               </li>
             </ul>
           </div>
@@ -133,32 +133,32 @@ export function Footer({ className }: FooterProps) {
             </h3>
             <ul className="space-y-space-xs font-body-md text-body-md text-on-surface-variant">
               <li>
-                <a href="#shipping-policy" className="hover:text-primary transition-colors">
+                <a href="#info/shipping-policy" className="hover:text-primary transition-colors">
                   Shipping Policy
                 </a>
               </li>
               <li>
-                <a href="#returns-policy" className="hover:text-primary transition-colors">
+                <a href="#info/returns-policy" className="hover:text-primary transition-colors">
                   Returns Policy
                 </a>
               </li>
               <li>
-                <a href="#privacy-policy" className="hover:text-primary transition-colors">
+                <a href="#info/privacy-policy" className="hover:text-primary transition-colors">
                   Privacy Policy
                 </a>
               </li>
               <li>
-                <a href="#terms" className="hover:text-primary transition-colors">
+                <a href="#info/terms" className="hover:text-primary transition-colors">
                   Terms &amp; Conditions
                 </a>
               </li>
               <li>
-                <a href="#grievance" className="hover:text-primary transition-colors">
+                <a href="#info/grievance" className="hover:text-primary transition-colors">
                   Grievance Officer
                 </a>
               </li>
               <li>
-                <a href="#compliance" className="hover:text-primary transition-colors">
+                <a href="#info/compliance" className="hover:text-primary transition-colors">
                   Consumer Protection Compliance
                 </a>
               </li>
@@ -166,13 +166,13 @@ export function Footer({ className }: FooterProps) {
           </div>
         </div>
 
-        {/* Payment & Security Section (Neutral & Non-fabricating) */}
+        {/* Payment & Security Section */}
         <div className="border-t border-outline-variant/40 pt-space-md flex flex-col md:flex-row items-center justify-between gap-space-md text-body-sm font-body-sm text-outline">
           <div>
-            <span>Verified Secure Checkout</span>
+            <span>Checkout payment is simulated in this demo</span>
           </div>
           <div className="text-body-sm text-outline text-center md:text-right">
-            <span>Multiple secure payment methods accepted at checkout</span>
+            <span>No card or CVV information is collected</span>
           </div>
         </div>
       </Container>

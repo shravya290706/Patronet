@@ -10,15 +10,22 @@ import {
 import { Container } from "@/components/layout"
 import { Breadcrumbs, type BreadcrumbItem, Pagination } from "@/components/ui"
 import { ProductCard, ProductGrid } from "@/components/products"
+import { FilterSidebar, type FilterState } from "@/components/products/FilterSidebar"
 import { SearchBar } from "@/components/search"
+import { getUiCategories } from "@/services/category.service"
+import { getProductBrands, isBackendUuid } from "@/services/product.service"
+import { normalizeApiError } from "@/services/api.errors"
 import { searchProducts } from "@/services/search.service"
-import type { UiProductCardModel } from "@/types/ui.types"
+import type { ApiSearchSortOption } from "@/types/api.types"
+import type { UiCategoryModel, UiProductCardModel } from "@/types/ui.types"
 import type { SearchSuggestionItem } from "@/mocks/search.mock"
 
 export interface SearchResultsPageProps {
   initialQuery?: string
   onProductClick?: (id: string) => void
-  onAddToCart?: (id: string) => void
+  onAddToCart?: (id: string) => void | Promise<void>
+  onToggleWishlist?: (id: string) => void | Promise<void>
+  wishlistedProductIds?: ReadonlySet<string>
   onNavigateHome?: () => void
   onSearchSubmit?: (newQuery: string) => void
   onCategoryClick?: (categoryId?: string) => void
@@ -30,6 +37,8 @@ export function SearchResultsPage({
   initialQuery = "",
   onProductClick,
   onAddToCart,
+  onToggleWishlist,
+  wishlistedProductIds,
   onNavigateHome,
   onSearchSubmit,
   onCategoryClick,
@@ -37,12 +46,43 @@ export function SearchResultsPage({
   const [activeQuery, setActiveQuery] = useState(initialQuery)
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery)
   const [currentPage, setCurrentPage] = useState(1)
+  const [sortOption, setSortOption] = useState<ApiSearchSortOption>("relevance")
+  const [filters, setFilters] = useState<FilterState>({})
+  const [categories, setCategories] = useState<UiCategoryModel[]>([])
+  const [brands, setBrands] = useState<string[]>([])
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true)
+  const [brandLoadError, setBrandLoadError] = useState<string | null>(null)
   const [products, setProducts] = useState<UiProductCardModel[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    async function loadFilterOptions() {
+      try {
+        const [categoryList, brandList] = await Promise.all([
+          getUiCategories(),
+          getProductBrands(),
+        ])
+        if (active) {
+          setCategories(categoryList)
+          setBrands(brandList)
+          setBrandLoadError(null)
+        }
+      } catch (rawError) {
+        if (active) setBrandLoadError(normalizeApiError(rawError).message)
+      } finally {
+        if (active) setIsCategoriesLoading(false)
+      }
+    }
+    void loadFilterOptions()
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Sync external initialQuery if updated during hash navigation
   if (initialQuery !== prevInitialQuery) {
@@ -74,6 +114,11 @@ export function SearchResultsPage({
           query: trimmed,
           page: currentPage,
           pageSize: PAGE_SIZE,
+          categoryId: isBackendUuid(filters.categoryId) ? filters.categoryId : undefined,
+          brand: filters.brand,
+          minPrice: filters.minPrice,
+          maxPrice: filters.maxPrice,
+          sort: sortOption,
         })
 
         if (!isCancelled) {
@@ -104,7 +149,7 @@ export function SearchResultsPage({
     return () => {
       isCancelled = true
     }
-  }, [activeQuery, currentPage, reloadKey])
+  }, [activeQuery, currentPage, reloadKey, filters, sortOption])
 
   const handleQuerySubmit = (newQuery: string) => {
     setActiveQuery(newQuery)
@@ -113,6 +158,15 @@ export function SearchResultsPage({
       onSearchSubmit(newQuery)
     }
   }
+
+  const handleFilterChange = (nextFilters: FilterState) => {
+    setFilters(nextFilters)
+    setCurrentPage(1)
+  }
+
+  const activeFilterCount = Number(Boolean(filters.categoryId)) +
+    Number(Boolean(filters.brand)) +
+    Number(filters.minPrice !== undefined || filters.maxPrice !== undefined)
 
   const handleSuggestionClick = (suggestion: SearchSuggestionItem) => {
     if (suggestion.type === "product" && suggestion.targetId && onProductClick) {
@@ -259,7 +313,42 @@ export function SearchResultsPage({
                 of <span className="font-semibold text-primary">{totalCount}</span> items matching{" "}
                 <span className="font-semibold text-primary">"{activeQuery}"</span>
               </span>
+              <label className="flex items-center gap-2 text-body-sm">
+                <span>Sort</span>
+                <select
+                  aria-label="Sort search results"
+                  value={sortOption}
+                  onChange={(event) => {
+                    setSortOption(event.target.value as ApiSearchSortOption)
+                    setCurrentPage(1)
+                  }}
+                  className="rounded-lg border border-surface-container bg-surface-container-lowest px-2 py-1 text-on-surface"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="newest">Newest First</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                </select>
+              </label>
             </div>
+
+            <details className="rounded-xl border border-surface-container bg-surface-container-lowest p-space-sm">
+              <summary className="cursor-pointer px-space-sm py-1 font-label-md text-primary">
+                Refine search{activeFilterCount ? ` (${activeFilterCount})` : ""}
+              </summary>
+              <FilterSidebar
+                key={`${filters.minPrice ?? ""}:${filters.maxPrice ?? ""}`}
+                categories={categories}
+                availableBrands={brands}
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                onResetFilters={() => handleFilterChange({})}
+                isCategoriesLoading={isCategoriesLoading}
+                brandLoadError={brandLoadError}
+                activeFilterCount={activeFilterCount}
+                className="mt-space-sm"
+              />
+            </details>
 
             {/* Results Grid */}
             <ProductGrid columns={4}>
@@ -269,6 +358,8 @@ export function SearchResultsPage({
                   product={product}
                   onViewDetails={onProductClick}
                   onAddToCart={onAddToCart}
+                  onToggleWishlist={onToggleWishlist}
+                  isWishlisted={wishlistedProductIds?.has(product.id)}
                 />
               ))}
             </ProductGrid>

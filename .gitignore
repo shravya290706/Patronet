@@ -28,3 +28,7 @@ Thumbs.db
 # Local databases
 *.sqlite3
 *.db
+
+# Temporary diagnostic and audit files
+audit_db*.py
+schema.txt

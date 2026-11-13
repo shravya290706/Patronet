@@ -43,17 +43,14 @@ export function ForgotPasswordPage({
 
     setIsSubmitting(true)
 
-    // Simulate standard asynchronous UI validation flow before backend seam
+    // No backend password reset endpoint exists.
     setTimeout(() => {
       setIsSubmitting(false)
-      // Per Phase 2 architecture requirements:
-      // Do not claim an email was sent without a successful backend response.
-      // Clarify the interface readiness for password reset backend integration.
       setStatusMessage({
         type: "info",
-        text: "Password reset request interface ready. Live delivery instructions will connect to the backend authentication API.",
+        text: "Password reset is not yet available. Please contact support or create a new account.",
       })
-    }, 600)
+    }, 400)
   }
 
   return (

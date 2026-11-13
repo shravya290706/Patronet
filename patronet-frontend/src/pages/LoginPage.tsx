@@ -1,17 +1,21 @@
 import { useState, type FormEvent } from "react"
 import { AuthLayout, PasswordInput } from "@/components/auth"
 import { AlertCircle, Loader2 } from "lucide-react"
+import { authService } from "@/services/auth.service"
+import { normalizeApiError } from "@/services/api.errors"
 
 interface LoginPageProps {
   onNavigateHome?: () => void
   onNavigateRegister?: () => void
   onNavigateForgotPassword?: () => void
+  onLoginSuccess?: () => void
 }
 
 export function LoginPage({
   onNavigateHome,
   onNavigateRegister,
   onNavigateForgotPassword,
+  onLoginSuccess,
 }: LoginPageProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -50,15 +54,23 @@ export function LoginPage({
 
     setIsSubmitting(true)
 
-    // Simulate standard asynchronous UI validation flow before backend seam
-    setTimeout(() => {
-      setIsSubmitting(false)
-      // Per Phase 2 architecture requirements:
-      // Frontend/backend separation - do not fake login success or issue fake tokens.
+    try {
+      await authService.login({ email, password, rememberMe })
+      if (onLoginSuccess) {
+        onLoginSuccess()
+      } else {
+        onNavigateHome?.()
+      }
+    } catch (rawError) {
+      const err = normalizeApiError(rawError)
       setFormError(
-        "Authentication service interface ready. Live sign-in will connect to the backend authentication API."
+        err.isUnauthorized
+          ? "Invalid email or password."
+          : err.message || "Sign in failed. Please try again."
       )
-    }, 600)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -134,6 +146,7 @@ export function LoginPage({
           </div>
           <PasswordInput
             id="password"
+            maxLength={128}
             value={password}
             onChange={(e) => {
               setPassword(e.target.value)

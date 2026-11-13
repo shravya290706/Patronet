@@ -10,17 +10,18 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
-from app.db.database import get_db
-from app.main import app
-from app.models.category import Category
-from app.models.product import Product
-from app.models.product_image import ProductImage
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.functions import Function
+
+from app.db.database import get_db
+from app.main import app
+from app.models.category import Category
+from app.models.product import Product
+from app.models.product_image import ProductImage
 
 client = TestClient(app, raise_server_exceptions=True)
 
@@ -67,7 +68,13 @@ def _make_product(name="Widget", price="999.00", brand="Acme", category=None, im
 _SENTINEL = object()
 
 
-def _override_db(products=None, categories=None, total=None, single_product=_SENTINEL):
+def _override_db(
+    products=None,
+    categories=None,
+    brands=None,
+    total=None,
+    single_product=_SENTINEL,
+):
     """
     Returns a get_db override function that yields a mock session.
     Handles the three query patterns used by the router:
@@ -79,6 +86,7 @@ def _override_db(products=None, categories=None, total=None, single_product=_SEN
     """
     products = products or []
     categories = categories or []
+    brands = brands or []
     use_single = single_product is not _SENTINEL
 
     def _is_count_query(stmt) -> bool:
@@ -102,6 +110,12 @@ def _override_db(products=None, categories=None, total=None, single_product=_SEN
             for f in froms
         )
 
+    def _is_brands_query(stmt) -> bool:
+        if not isinstance(stmt, Select) or len(stmt.column_descriptions) != 1:
+            return False
+        expression = stmt.column_descriptions[0].get("expr")
+        return getattr(expression, "name", "") == "brand"
+
     def _get_db_override():
         db = MagicMock()
 
@@ -112,6 +126,8 @@ def _override_db(products=None, categories=None, total=None, single_product=_SEN
                 result.scalar_one.return_value = (
                     total if total is not None else len(products)
                 )
+            elif _is_brands_query(stmt):
+                result.scalars.return_value.all.return_value = brands
             elif use_single:
                 result.scalar_one_or_none.return_value = single_product
             elif _is_categories_query(stmt):
@@ -433,6 +449,28 @@ class TestCategories:
         assert resp.status_code == 200
         assert resp.json() == []
         print("PASS: empty categories returns empty list")
+
+
+class TestProductBrands:
+    def test_returns_sorted_brand_names(self):
+        app.dependency_overrides[get_db] = _override_db(
+            brands=["boAt", "Acme"]
+        )
+
+        resp = client.get("/api/products/brands")
+        app.dependency_overrides.clear()
+
+        assert resp.status_code == 200
+        assert resp.json() == ["Acme", "boAt"]
+
+    def test_brand_endpoint_is_matched_before_product_uuid_route(self):
+        app.dependency_overrides[get_db] = _override_db(brands=["Acme"])
+
+        resp = client.get("/api/products/brands")
+        app.dependency_overrides.clear()
+
+        assert resp.status_code == 200
+        assert resp.json() == ["Acme"]
 
 
 # ---------------------------------------------------------------------------

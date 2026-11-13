@@ -4,11 +4,40 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Locate the .env file in the repository root
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-ENV_FILE = PROJECT_ROOT / ".env"
+# Resolve backend root and repository root robustly whether deployed
+# as a submodule, in a monorepo, or inside a container at /app
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+if (BACKEND_ROOT.parent / ".env").is_file():
+    PROJECT_ROOT = BACKEND_ROOT.parent
+elif (BACKEND_ROOT / ".env").is_file():
+    PROJECT_ROOT = BACKEND_ROOT
+elif (BACKEND_ROOT.parent / "patronet-backend").is_dir():
+    PROJECT_ROOT = BACKEND_ROOT.parent
+else:
+    PROJECT_ROOT = BACKEND_ROOT
 
-load_dotenv(ENV_FILE)
+for env_candidate in [PROJECT_ROOT / ".env", BACKEND_ROOT / ".env", Path(".env")]:
+    if env_candidate.is_file():
+        load_dotenv(env_candidate)
+        break
+else:
+    load_dotenv()
+
+
+def _resolve_ca_cert() -> str:
+    env_ca = os.getenv("KAFKA_CA_LOCATION")
+    if env_ca and Path(env_ca).is_file():
+        return env_ca
+    candidates = [
+        BACKEND_ROOT / "certs" / "ca.pem",
+        PROJECT_ROOT / "patronet-backend" / "certs" / "ca.pem",
+        PROJECT_ROOT / "certs" / "ca.pem",
+        Path("certs/ca.pem"),
+    ]
+    for c in candidates:
+        if c.is_file():
+            return str(c.resolve())
+    return env_ca or str(BACKEND_ROOT / "certs" / "ca.pem")
 
 
 class Settings:
@@ -40,9 +69,7 @@ class Settings:
     KAFKA_SASL_MECHANISM: str = os.getenv(
         "KAFKA_SASL_MECHANISM", "PLAIN"
     )
-    KAFKA_CA_LOCATION: str = os.getenv("KAFKA_CA_LOCATION") or str(
-        PROJECT_ROOT / "patronet-backend" / "certs" / "ca.pem"
-    )
+    KAFKA_CA_LOCATION: str = _resolve_ca_cert()
     KAFKA_ORDER_EVENTS_TOPIC: str = os.getenv("KAFKA_ORDER_EVENTS_TOPIC", "")
     KAFKA_ORDER_EVENTS_CONSUMER_GROUP: str = os.getenv(
         "KAFKA_ORDER_EVENTS_CONSUMER_GROUP", ""

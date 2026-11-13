@@ -19,6 +19,17 @@ import {
   mapApiProductDetail,
 } from "./mappers/product.mapper"
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function isBackendUuid(value: string | undefined): value is string {
+  return value !== undefined && UUID_PATTERN.test(value)
+}
+
+export async function getProductBrands(): Promise<string[]> {
+  return apiClient<string[]>("/api/products/brands")
+}
+
 /**
  * Fetches paginated products from GET /api/products
  * Supported query params only: page, page_size, category_id, brand, min_price, max_price, sort.
@@ -58,7 +69,11 @@ export async function getUiProducts(
 export async function getProductDetail(
   productId: string
 ): Promise<ApiProductDetail> {
-  const cleanId = encodeURIComponent(productId.trim())
+  const trimmedId = productId.trim()
+  if (!isBackendUuid(trimmedId)) {
+    throw new Error("This catalog item does not have a valid product ID.")
+  }
+  const cleanId = encodeURIComponent(trimmedId)
   return apiClient<ApiProductDetail>(`/api/products/${cleanId}`)
 }
 

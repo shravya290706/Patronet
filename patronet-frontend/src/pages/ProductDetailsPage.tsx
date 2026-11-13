@@ -13,12 +13,11 @@ import {
 import { Container } from "@/components/layout"
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui"
 import { ProductImageGallery, ProductCard, ProductGrid } from "@/components/products"
-import { getUiProductDetail } from "@/services/product.service"
+import { getUiProductDetail, getUiProducts, isBackendUuid } from "@/services/product.service"
 import { normalizeApiError } from "@/services/api.errors"
-import {
-  getMockProductDetailById,
-  mockCatalogProducts,
-} from "@/mocks/products.mock"
+import { addCartItem } from "@/services/cart.service"
+import { isAuthenticated } from "@/services/token.store"
+import { getMockProductDetailById } from "@/mocks/products.mock"
 import type { UiProductDetailModel, UiProductCardModel } from "@/types/ui.types"
 
 export interface ProductDetailsPageProps {
@@ -26,6 +25,10 @@ export interface ProductDetailsPageProps {
   onNavigateHome?: () => void
   onNavigateCategory?: (categoryId?: string) => void
   onNavigateProduct?: (id: string) => void
+  onNavigateLogin?: () => void
+  onAddToCart?: (productId: string, quantity: number) => Promise<void>
+  onToggleWishlist?: (productId: string) => Promise<void>
+  wishlistedProductIds?: ReadonlySet<string>
 }
 
 export function ProductDetailsPage({
@@ -33,6 +36,10 @@ export function ProductDetailsPage({
   onNavigateHome,
   onNavigateCategory,
   onNavigateProduct,
+  onNavigateLogin,
+  onAddToCart,
+  onToggleWishlist,
+  wishlistedProductIds,
 }: ProductDetailsPageProps) {
   // State
   const [product, setProduct] = useState<UiProductDetailModel | null>(null)
@@ -42,12 +49,18 @@ export function ProductDetailsPage({
 
   // Interactive controls
   const [quantity, setQuantity] = useState<number>(1)
-  const [isWishlisted, setIsWishlisted] = useState<boolean>(false)
+  const [localWishlisted, setLocalWishlisted] = useState<boolean>(false)
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false)
+  const isWishlisted = product
+    ? wishlistedProductIds?.has(product.id) ?? localWishlisted
+    : localWishlisted
   const [cartSuccessMessage, setCartSuccessMessage] = useState<string | null>(null)
+  const [isAddingToCart, setIsAddingToCart] = useState<boolean>(false)
 
   // Pincode input state
   const [pincodeInput, setPincodeInput] = useState<string>("")
   const [pincodeFeedback, setPincodeFeedback] = useState<string | null>(null)
+  const [relatedProducts, setRelatedProducts] = useState<UiProductCardModel[]>([])
 
   // Fetch product detail
   useEffect(() => {
@@ -107,6 +120,35 @@ export function ProductDetailsPage({
     }
   }, [productId, reloadKey])
 
+  useEffect(() => {
+    let isCancelled = false
+    async function loadRelatedProducts() {
+      if (!product?.categoryId || !isBackendUuid(product.categoryId)) {
+        setRelatedProducts([])
+        return
+      }
+      try {
+        const response = await getUiProducts({
+          category_id: product.categoryId,
+          page: 1,
+          page_size: 5,
+          sort: "newest",
+        })
+        if (!isCancelled) {
+          setRelatedProducts(
+            response.items.filter((item) => item.id !== product.id).slice(0, 4)
+          )
+        }
+      } catch {
+        if (!isCancelled) setRelatedProducts([])
+      }
+    }
+    loadRelatedProducts()
+    return () => {
+      isCancelled = true
+    }
+  }, [product])
+
   // Quantity adjustments
   const handleQuantityChange = (delta: number) => {
     setQuantity((prev) => Math.max(1, prev + delta))
@@ -119,20 +161,53 @@ export function ProductDetailsPage({
     }
   }
 
-  // Local Add to Cart confirmation
-  const handleAddToCart = () => {
+  // Add to Cart — calls real API if authenticated, prompts login otherwise
+  const handleAddToCart = async () => {
     if (!product) return
-    setCartSuccessMessage(
-      `Added ${quantity} × ${product.name} (SKU: ${product.sku}) to your local cart.`
-    )
-    setTimeout(() => {
+
+    if (!isAuthenticated() && !onAddToCart) {
       setCartSuccessMessage(null)
-    }, 4500)
+      if (onNavigateLogin) {
+        onNavigateLogin()
+      } else {
+        setCartSuccessMessage("Please sign in to add items to your cart.")
+      }
+      return
+    }
+
+    setIsAddingToCart(true)
+    try {
+      if (onAddToCart) {
+        await onAddToCart(product.id, quantity)
+      } else {
+        await addCartItem({ product_id: product.id, quantity })
+      }
+      setCartSuccessMessage(
+        `Added ${quantity} × ${product.name} to your cart.`
+      )
+      setTimeout(() => setCartSuccessMessage(null), 4500)
+    } catch (rawError) {
+      const err = normalizeApiError(rawError)
+      setCartSuccessMessage(err.message || "Failed to add to cart. Please try again.")
+    } finally {
+      setIsAddingToCart(false)
+    }
   }
 
-  // Local Wishlist toggle
-  const handleToggleWishlist = () => {
-    setIsWishlisted((prev) => !prev)
+  const handleToggleWishlist = async () => {
+    if (!product || isTogglingWishlist) return
+    setIsTogglingWishlist(true)
+    try {
+      if (onToggleWishlist) {
+        await onToggleWishlist(product.id)
+      } else {
+        setLocalWishlisted((prev) => !prev)
+      }
+    } catch (rawError) {
+      setCartSuccessMessage(normalizeApiError(rawError).message)
+    } finally {
+      setIsTogglingWishlist(false)
+    }
   }
 
   // Pincode validation handler
@@ -152,7 +227,7 @@ export function ProductDetailsPage({
     }
 
     setPincodeFeedback(
-      "Pincode format verified (6 digits). Live delivery serviceability will connect to the backend API."
+      "The pincode format is valid. Live delivery availability is not currently provided by the backend."
     )
   }
 
@@ -164,11 +239,6 @@ export function ProductDetailsPage({
         maximumFractionDigits: 0,
       }).format(product.price)
     : ""
-
-  // Related products from same category or mock catalog
-  const relatedProducts: UiProductCardModel[] = mockCatalogProducts
-    .filter((p) => p.id !== productId)
-    .slice(0, 4)
 
   // Breadcrumb navigation items
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -369,16 +439,18 @@ export function ProductDetailsPage({
                     <button
                       type="button"
                       onClick={handleAddToCart}
-                      className="flex-1 w-full h-12 bg-primary hover:bg-primary-container text-on-primary rounded-xl font-label-md text-label-md flex items-center justify-center gap-space-sm shadow-xs transition-all duration-200 active:scale-[0.99] font-bold cursor-pointer"
+                      disabled={isAddingToCart}
+                      className="flex-1 w-full h-12 bg-primary hover:bg-primary-container text-on-primary rounded-xl font-label-md text-label-md flex items-center justify-center gap-space-sm shadow-xs transition-all duration-200 active:scale-[0.99] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <ShoppingBag className="w-5 h-5" />
-                      <span>Add to Cart</span>
+                      <span>{isAddingToCart ? "Adding..." : "Add to Cart"}</span>
                     </button>
 
                     {/* Local Wishlist Button */}
                     <button
                       type="button"
                       onClick={handleToggleWishlist}
+                      disabled={isTogglingWishlist}
                       aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                       className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors shadow-xs shrink-0 cursor-pointer ${
                         isWishlisted
@@ -468,6 +540,11 @@ export function ProductDetailsPage({
                     key={relProduct.id}
                     product={relProduct}
                     onViewDetails={onNavigateProduct}
+                    onAddToCart={
+                      onAddToCart ? (id) => onAddToCart(id, 1) : undefined
+                    }
+                    onToggleWishlist={onToggleWishlist}
+                    isWishlisted={wishlistedProductIds?.has(relProduct.id)}
                   />
                 ))}
               </ProductGrid>

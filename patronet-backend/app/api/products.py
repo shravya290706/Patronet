@@ -139,6 +139,23 @@ def search_products_endpoint(
         ) from error
 
 
+@router.get("/products/brands", response_model=list[str])
+def list_product_brands(
+    db: Session = Depends(get_db),  # noqa: B008
+) -> list[str]:
+    brands = db.execute(
+        select(Product.brand)
+        .where(
+            Product.is_active.is_(True),
+            Product.brand.is_not(None),
+            func.trim(Product.brand) != "",
+        )
+        .distinct()
+        .order_by(Product.brand)
+    ).scalars().all()
+    return sorted(brands, key=str.casefold)
+
+
 @router.get("/products/{product_id}", response_model=ProductDetail)
 def get_product(
     product_id: UUID,

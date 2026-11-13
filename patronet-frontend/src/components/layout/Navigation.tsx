@@ -7,6 +7,7 @@ interface NavigationProps {
   mobileMenuOpen: boolean
   onCloseMobileMenu: () => void
   onCategorySelect?: (categoryId: string) => void
+  onLocationClick?: () => void
   className?: string
 }
 
@@ -15,6 +16,7 @@ export function Navigation({
   mobileMenuOpen,
   onCloseMobileMenu,
   onCategorySelect,
+  onLocationClick,
   className,
 }: NavigationProps) {
   // Navigation categories and links present in Stitch design
@@ -43,17 +45,17 @@ export function Navigation({
       <div className={cn("h-10 bg-surface-container-low border-t border-surface-container/60", className)}>
         <Container className="h-full flex items-center justify-between text-body-sm font-body-sm text-on-surface-variant overflow-x-auto no-scrollbar whitespace-nowrap">
           {/* Location Delivery Picker */}
-          <div
+          <button
+            type="button"
+            onClick={onLocationClick}
             className="flex items-center gap-space-xs flex-shrink-0 mr-space-lg select-none cursor-pointer hover:text-primary transition-colors"
-            role="button"
-            tabIndex={0}
-            aria-label="Select delivery location"
+            aria-label="Manage delivery addresses"
           >
             <MapPin className="h-4 w-4 text-primary" />
             <span className="font-label-md text-label-md text-on-surface">
               {deliveryLabel}
             </span>
-          </div>
+          </button>
 
           {/* Navigation Links */}
           <nav aria-label="Department navigation" className="flex items-center gap-space-lg">
@@ -94,12 +96,12 @@ export function Navigation({
               </button>
             </div>
 
-            <div className="py-space-md border-b border-surface-container flex items-center gap-space-xs text-body-sm select-none">
+            <button type="button" onClick={() => { onLocationClick?.(); onCloseMobileMenu() }} className="py-space-md border-b border-surface-container flex items-center gap-space-xs text-body-sm select-none text-left">
               <MapPin className="h-4 w-4 text-primary" />
               <span className="font-label-md text-label-md text-on-surface">
                 {deliveryLabel}
               </span>
-            </div>
+            </button>
 
             <nav className="flex flex-col gap-space-sm pt-space-md overflow-y-auto">
               {navItems.map((item) => (

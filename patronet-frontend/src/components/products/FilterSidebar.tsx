@@ -17,6 +17,7 @@ interface FilterSidebarProps {
   onFilterChange: (filters: FilterState) => void
   onResetFilters: () => void
   isCategoriesLoading?: boolean
+  brandLoadError?: string | null
   className?: string
   activeFilterCount?: number
 }
@@ -28,6 +29,7 @@ export function FilterSidebar({
   onFilterChange,
   onResetFilters,
   isCategoriesLoading = false,
+  brandLoadError,
   className,
   activeFilterCount = 0,
 }: FilterSidebarProps) {
@@ -74,13 +76,13 @@ export function FilterSidebar({
     const parsedMin = minInput.trim() !== "" ? Number(minInput) : undefined
     const parsedMax = maxInput.trim() !== "" ? Number(maxInput) : undefined
 
-    if (parsedMin !== undefined && (isNaN(parsedMin) || parsedMin < 0)) {
-      setPriceError("Min price must be a positive number")
+    if (parsedMin !== undefined && (!Number.isFinite(parsedMin) || parsedMin < 0)) {
+      setPriceError("Minimum price must be a valid non-negative number.")
       return
     }
 
-    if (parsedMax !== undefined && (isNaN(parsedMax) || parsedMax < 0)) {
-      setPriceError("Max price must be a positive number")
+    if (parsedMax !== undefined && (!Number.isFinite(parsedMax) || parsedMax < 0)) {
+      setPriceError("Maximum price must be a valid non-negative number.")
       return
     }
 
@@ -321,7 +323,11 @@ export function FilterSidebar({
 
         {/* Brand list */}
         <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 font-body-sm text-body-sm text-on-surface-variant">
-          {displayedBrands.length === 0 ? (
+          {brandLoadError ? (
+            <p role="status" className="text-error text-label-sm py-2">
+              {brandLoadError}
+            </p>
+          ) : displayedBrands.length === 0 ? (
             <p className="text-outline text-label-sm py-2 text-center">
               No matching brands
             </p>

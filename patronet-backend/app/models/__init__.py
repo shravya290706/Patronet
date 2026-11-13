@@ -10,18 +10,20 @@ from app.models.outbox_event import OutboxEvent
 from app.models.product import Product
 from app.models.product_image import ProductImage
 from app.models.store import Store
+from app.models.wishlist_item import WishlistItem
 
 __all__ = [
-    "Customer",
     "Address",
-    "Category",
-    "Product",
-    "ProductImage",
-    "Store",
-    "Inventory",
     "Cart",
     "CartItem",
+    "Category",
+    "Customer",
+    "Inventory",
     "Order",
     "OrderItem",
     "OutboxEvent",
+    "Product",
+    "ProductImage",
+    "Store",
+    "WishlistItem",
 ]

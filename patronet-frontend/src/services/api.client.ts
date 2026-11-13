@@ -3,7 +3,12 @@
  * Uses VITE_API_BASE_URL environment variable.
  */
 
-import { ApiError, normalizeApiError } from "./api.errors"
+import {
+  ApiError,
+  formatApiErrorDetail,
+  normalizeApiError,
+} from "./api.errors"
+import { clearStoredToken } from "./token.store"
 
 // Check environment configuration explicitly
 const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
@@ -77,24 +82,49 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
       },
     })
 
+    const responseText = await response.text()
     if (!response.ok) {
-      let errorDetail: unknown = null
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
-
-      try {
-        errorDetail = await response.json()
-        if (typeof errorDetail === "object" && errorDetail !== null && "detail" in errorDetail) {
-          const d = (errorDetail as { detail: unknown }).detail
-          errorMessage = typeof d === "string" ? d : JSON.stringify(d)
+      if (response.status === 401) {
+        try {
+          clearStoredToken()
+        } catch {
+          console.warn("[PATRONET Auth] Could not clear an expired browser session.")
         }
-      } catch {
-        // Response was not JSON
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("patronet:auth-expired"))
+        }
       }
+      let errorDetail: unknown = responseText || null
+      try {
+        errorDetail = responseText ? JSON.parse(responseText) : null
+      } catch {
+        // Keep plain-text error bodies as details.
+      }
+
+      const detail =
+        typeof errorDetail === "object" && errorDetail !== null && "detail" in errorDetail
+          ? (errorDetail as { detail: unknown }).detail
+          : errorDetail
+      const errorMessage =
+        formatApiErrorDetail(detail) ??
+        `Request failed (${response.status}). Please try again.`
 
       throw new ApiError(response.status, response.statusText, errorMessage, errorDetail)
     }
 
-    return (await response.json()) as T
+    if (response.status === 204 || !responseText.trim()) {
+      return undefined as T
+    }
+
+    try {
+      return JSON.parse(responseText) as T
+    } catch {
+      throw new ApiError(
+        502,
+        "INVALID_RESPONSE",
+        "The server returned an unreadable response."
+      )
+    }
   } catch (error) {
     throw normalizeApiError(error)
   }

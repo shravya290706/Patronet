@@ -1,15 +1,19 @@
 import { useState, type FormEvent } from "react"
 import { AuthLayout, PasswordInput } from "@/components/auth"
 import { AlertCircle, Loader2 } from "lucide-react"
+import { authService } from "@/services/auth.service"
+import { normalizeApiError } from "@/services/api.errors"
 
 interface RegisterPageProps {
   onNavigateHome?: () => void
   onNavigateLogin?: () => void
+  onRegisterSuccess?: () => void
 }
 
 export function RegisterPage({
   onNavigateHome,
   onNavigateLogin,
+  onRegisterSuccess,
 }: RegisterPageProps) {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -53,8 +57,10 @@ export function RegisterPage({
 
     if (!password) {
       nextErrors.password = "Password is required."
-    } else if (password.length < 6) {
-      nextErrors.password = "Password should be at least 6 characters."
+    } else if (password.length < 8) {
+      nextErrors.password = "Password must be at least 8 characters."
+    } else if (password.length > 128) {
+      nextErrors.password = "Password must be no more than 128 characters."
     }
 
     if (!confirmPassword) {
@@ -81,15 +87,30 @@ export function RegisterPage({
 
     setIsSubmitting(true)
 
-    // Simulate standard asynchronous UI validation flow before backend seam
-    setTimeout(() => {
-      setIsSubmitting(false)
-      // Per Phase 2 architecture requirements:
-      // Frontend/backend separation - do not simulate fake registered user.
+    try {
+      await authService.register({
+        fullName,
+        email,
+        mobile,
+        password,
+        confirmPassword,
+        acceptTerms,
+      })
+      if (onRegisterSuccess) {
+        onRegisterSuccess()
+      } else {
+        onNavigateLogin?.()
+      }
+    } catch (rawError) {
+      const err = normalizeApiError(rawError)
       setFormError(
-        "Registration interface ready. Live account creation will connect to the backend authentication API."
+        err.status === 409
+          ? "An account with this email already exists."
+          : err.message || "Registration failed. Please try again."
       )
-    }, 600)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -214,6 +235,7 @@ export function RegisterPage({
             </label>
             <PasswordInput
               id="password"
+              maxLength={128}
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value)
@@ -238,6 +260,7 @@ export function RegisterPage({
             </label>
             <PasswordInput
               id="confirmPassword"
+              maxLength={128}
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value)
