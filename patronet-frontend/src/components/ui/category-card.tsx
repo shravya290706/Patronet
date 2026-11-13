@@ -39,11 +39,11 @@ export function CategoryCard({
       </div>
 
       {category.imageUrl && (
-        <div className="w-28 h-28 self-end -mr-2 -mb-2">
+        <div className="w-28 h-28 self-end -mr-2 -mb-2 rounded-lg overflow-hidden flex items-center justify-center bg-surface-container-lowest/50">
           <img
             src={category.imageUrl}
             alt={category.name}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 rounded-lg"
             loading="lazy"
           />
         </div>

@@ -101,9 +101,17 @@ export async function getSearchSuggestions(
       imageUrl: product.imageUrl,
     })
   )
+  const matchedProductCategories = new Set(
+    products.items
+      .map((product) => product.categoryName?.toLocaleLowerCase())
+      .filter((name): name is string => Boolean(name))
+  )
+  const lowerQuery = trimmed.toLocaleLowerCase()
   const matchingCategories: SearchSuggestionItem[] = categories
-    .filter((category) =>
-      category.name.toLocaleLowerCase().includes(trimmed.toLocaleLowerCase())
+    .filter(
+      (category) =>
+        category.name.toLocaleLowerCase().includes(lowerQuery) ||
+        matchedProductCategories.has(category.name.toLocaleLowerCase())
     )
     .slice(0, 3)
     .map((category) => ({

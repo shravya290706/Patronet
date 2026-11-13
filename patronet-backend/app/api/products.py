@@ -5,12 +5,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from opensearchpy import OpenSearch
-from opensearchpy.exceptions import NotFoundError
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.database import get_db
 from app.models.category import Category
+from app.models.inventory import Inventory
 from app.models.product import Product
 from app.models.product_image import ProductImage
 from app.schemas.product import (
@@ -25,6 +25,7 @@ from app.services.opensearch_client import get_opensearch_client
 from app.services.product_search import (
     MAX_RESULT_WINDOW,
     SearchSort,
+    fuzzy_score_product,
 )
 from app.services.product_search import (
     search_products as run_product_search,
@@ -144,44 +145,85 @@ def search_products_endpoint(
             "OpenSearch product search failed or unconfigured (%s); using PostgreSQL fallback.",
             error,
         )
+        load_options = [
+            selectinload(Product.category),
+            selectinload(Product.images),
+        ]
+        if city and city.strip():
+            load_options.append(
+                selectinload(Product.inventory).selectinload(Inventory.store)
+            )
+
         base_query = (
             select(Product)
             .where(Product.is_active.is_(True))
-            .options(
-                selectinload(Product.category),
-                selectinload(Product.images),
-            )
+            .options(*load_options)
         )
-        if q and q.strip():
-            terms = q.strip().split()
-            for term in terms:
-                pattern = f"%{term}%"
-                base_query = base_query.where(
-                    or_(
-                        Product.name.ilike(pattern),
-                        Product.brand.ilike(pattern),
-                        Product.description.ilike(pattern),
-                    )
-                )
         if category_id is not None:
             base_query = base_query.where(Product.category_id == category_id)
-        if brand is not None:
-            base_query = base_query.where(func.lower(Product.brand) == brand.lower())
+        if brand is not None and brand.strip():
+            base_query = base_query.where(
+                func.lower(Product.brand) == brand.strip().lower()
+            )
         if min_price is not None:
             base_query = base_query.where(Product.price >= min_price)
         if max_price is not None:
             base_query = base_query.where(Product.price <= max_price)
 
-        total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
-        sort_col = Product.created_at.desc()
-        if sort == "price_asc":
-            sort_col = Product.price.asc()
-        elif sort == "price_desc":
-            sort_col = Product.price.desc()
+        candidates = list(db.scalars(base_query).all())
 
-        products = db.scalars(
-            base_query.order_by(sort_col).offset((page - 1) * page_size).limit(page_size)
-        ).all()
+        if city and city.strip():
+            target_city = city.strip().lower()
+            candidates = [
+                p
+                for p in candidates
+                if any(
+                    inv.store is not None
+                    and inv.store.is_active
+                    and inv.available_stock > 0
+                    and inv.store.city.lower() == target_city
+                    for inv in p.inventory
+                )
+            ]
+
+        normalized_q = q.strip() if q else ""
+        if normalized_q:
+            scored: list[tuple[float, Product]] = []
+            for p in candidates:
+                score = fuzzy_score_product(p, normalized_q)
+                if score > 0:
+                    scored.append((score, p))
+
+            if sort == "price_asc":
+                scored.sort(key=lambda item: (item[1].price, -item[0], str(item[1].id)))
+            elif sort == "price_desc":
+                scored.sort(key=lambda item: (-item[1].price, -item[0], str(item[1].id)))
+            elif sort == "newest":
+                scored.sort(
+                    key=lambda item: (
+                        -item[1].created_at.timestamp(),
+                        -item[0],
+                        str(item[1].id),
+                    )
+                )
+            else:
+                scored.sort(key=lambda item: (-item[0], str(item[1].id)))
+
+            total = len(scored)
+            start = (page - 1) * page_size
+            products = [item[1] for item in scored[start : start + page_size]]
+        else:
+            if sort == "price_asc":
+                candidates.sort(key=lambda p: (p.price, str(p.id)))
+            elif sort == "price_desc":
+                candidates.sort(key=lambda p: (-p.price, str(p.id)))
+            else:
+                candidates.sort(
+                    key=lambda p: (-p.created_at.timestamp(), str(p.id))
+                )
+            total = len(candidates)
+            start = (page - 1) * page_size
+            products = candidates[start : start + page_size]
 
         results = []
         for p in products:

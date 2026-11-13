@@ -18,6 +18,7 @@ from app.services.product_search import (
     PRODUCT_INDEX_DEFINITION,
     build_product_document,
     build_search_body,
+    fuzzy_score_product,
     rebuild_product_index,
 )
 
@@ -315,3 +316,12 @@ def test_search_endpoint_rejects_invalid_range_and_result_window(
     assert response.status_code == 422
     assert response.json()["detail"] == expected_detail
     open_search.search.assert_not_called()
+
+
+def test_fuzzy_score_product_recognizes_misspellings_and_synonyms(sqlite_session):
+    product = _add_product(sqlite_session, "SKU-FUZZY-1")
+    assert fuzzy_score_product(product, "wireles headfones") > 0
+    assert fuzzy_score_product(product, "hedphones") > 0
+    assert fuzzy_score_product(product, "acmee") > 0
+    assert fuzzy_score_product(product, "refrigrator") == 0
+
