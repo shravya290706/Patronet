@@ -4,8 +4,6 @@ and carry the expected constraints and relationships.
 No data is written to the Aiven database.
 """
 
-from sqlalchemy import inspect
-
 from app.db.base import Base
 from app.db.database import engine
 from app.models import (
