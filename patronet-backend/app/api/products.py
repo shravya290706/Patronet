@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -5,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from opensearchpy import OpenSearch
 from opensearchpy.exceptions import NotFoundError
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.database import get_db
@@ -17,6 +18,7 @@ from app.schemas.product import (
     PaginatedProducts,
     ProductDetail,
     ProductSearchResponse,
+    ProductSearchResult,
     ProductSummary,
 )
 from app.services.opensearch_client import get_opensearch_client
@@ -27,6 +29,8 @@ from app.services.product_search import (
 from app.services.product_search import (
     search_products as run_product_search,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["products"])
 
@@ -110,6 +114,7 @@ def search_products_endpoint(
     city: str | None = Query(None, max_length=100, description="Only products in stock in this city"),
     sort: SearchSort = Query("relevance", description="Search relevance, price, or newest order"),  # noqa: B008
     client: OpenSearch = Depends(get_opensearch_client),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
 ):
     if min_price is not None and max_price is not None and max_price < min_price:
         raise HTTPException(status_code=422, detail="max_price must be >= min_price")
@@ -132,11 +137,77 @@ def search_products_endpoint(
             city=city,
             sort=sort,
         )
-    except NotFoundError as error:
-        raise HTTPException(
-            status_code=503,
-            detail="Product search index is not initialized; rebuild it from PostgreSQL.",
-        ) from error
+    except Exception as error:
+        logger.warning(
+            "OpenSearch product search failed or unconfigured (%s); using PostgreSQL fallback.",
+            error,
+        )
+        base_query = (
+            select(Product)
+            .where(Product.is_active.is_(True))
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.images),
+            )
+        )
+        if q and q.strip():
+            terms = q.strip().split()
+            for term in terms:
+                pattern = f"%{term}%"
+                base_query = base_query.where(
+                    or_(
+                        Product.name.ilike(pattern),
+                        Product.brand.ilike(pattern),
+                        Product.description.ilike(pattern),
+                    )
+                )
+        if category_id is not None:
+            base_query = base_query.where(Product.category_id == category_id)
+        if brand is not None:
+            base_query = base_query.where(func.lower(Product.brand) == brand.lower())
+        if min_price is not None:
+            base_query = base_query.where(Product.price >= min_price)
+        if max_price is not None:
+            base_query = base_query.where(Product.price <= max_price)
+
+        total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
+        sort_col = Product.created_at.desc()
+        if sort == "price_asc":
+            sort_col = Product.price.asc()
+        elif sort == "price_desc":
+            sort_col = Product.price.desc()
+
+        products = db.scalars(
+            base_query.order_by(sort_col).offset((page - 1) * page_size).limit(page_size)
+        ).all()
+
+        results = []
+        for p in products:
+            p.images = _sorted_images(p)
+            summary = ProductSummary.model_validate(p)
+            summary.primary_image = _primary_image(p)
+            results.append(
+                ProductSearchResult(
+                    id=summary.id,
+                    name=summary.name,
+                    description=p.description,
+                    brand=summary.brand,
+                    sku=summary.sku,
+                    price=summary.price,
+                    is_active=summary.is_active,
+                    category=summary.category,
+                    primary_image=summary.primary_image,
+                    created_at=summary.created_at,
+                    stores=[],
+                )
+            )
+
+        return ProductSearchResponse(
+            total=total,
+            page=page,
+            page_size=page_size,
+            results=results,
+        )
 
 
 @router.get("/products/brands", response_model=list[str])
