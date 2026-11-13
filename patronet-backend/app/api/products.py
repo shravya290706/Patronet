@@ -113,7 +113,7 @@ def search_products_endpoint(
     max_price: Decimal | None = Query(None, ge=0, description="Maximum price"),  # noqa: B008
     city: str | None = Query(None, max_length=100, description="Only products in stock in this city"),
     sort: SearchSort = Query("relevance", description="Search relevance, price, or newest order"),  # noqa: B008
-    client: OpenSearch = Depends(get_opensearch_client),  # noqa: B008
+    client: OpenSearch | None = Depends(get_opensearch_client),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     if min_price is not None and max_price is not None and max_price < min_price:
@@ -125,6 +125,8 @@ def search_products_endpoint(
         )
 
     try:
+        if client is None:
+            raise ConnectionError("OpenSearch is not configured")
         return run_product_search(
             client,
             query=q,

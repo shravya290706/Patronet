@@ -23,7 +23,10 @@ def create_opensearch_client():
     )
 
 
-def get_opensearch_client() -> Iterator[OpenSearch]:
+def get_opensearch_client() -> Iterator[OpenSearch | None]:
+    if not settings.OPENSEARCH_HOST or not settings.OPENSEARCH_HOST.strip():
+        yield None
+        return
     client = create_opensearch_client()
     try:
         yield client
