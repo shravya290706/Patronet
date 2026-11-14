@@ -33,6 +33,7 @@ export interface UiCategoryModel {
   description?: string
   iconName?: string
   imageUrl?: string
+  subcategories?: UiCategoryModel[]
 }
 
 export interface UiPaginatedList<T> {

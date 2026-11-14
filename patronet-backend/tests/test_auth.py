@@ -131,6 +131,13 @@ def test_login_rejects_incorrect_password(auth_client: TestClient):
 
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
+    assert response.json()["detail"] == "Invalid email or password."
+
+
+def test_me_rejects_missing_token(auth_client: TestClient):
+    response = auth_client.get("/api/auth/me")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required. Please sign in."
 
 
 def test_me_rejects_invalid_token(auth_client: TestClient):
@@ -140,6 +147,7 @@ def test_me_rejects_invalid_token(auth_client: TestClient):
     )
 
     assert response.status_code == 401
+    assert response.json()["detail"] == "Your session has expired. Please sign in again."
 
 
 def test_me_returns_safe_profile_for_authenticated_customer(auth_client: TestClient):

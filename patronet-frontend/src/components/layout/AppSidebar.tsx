@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Home,
   Package,
@@ -14,16 +14,24 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   PanelLeft,
+  Layers,
   X,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getUiCategories } from "@/services/category.service"
+import { mockHomepageCategories } from "@/mocks/categories.mock"
+import type { UiCategoryModel } from "@/types/ui.types"
 
 export interface AppSidebarProps {
   activeView?: string
+  selectedCategoryId?: string
+  categories?: UiCategoryModel[]
+  onCategorySelect?: (categoryId: string) => void
   onNavigateHome?: () => void
-  onNavigateProducts?: () => void
+  onNavigateProducts?: (categoryId?: string) => void
   onNavigateSearch?: () => void
   onNavigateCart?: () => void
   onNavigateWishlist?: () => void
@@ -51,6 +59,9 @@ interface NavItemDef {
 
 export function AppSidebar({
   activeView = "home",
+  selectedCategoryId,
+  categories,
+  onCategorySelect,
   onNavigateHome,
   onNavigateProducts,
   onNavigateSearch,
@@ -70,6 +81,61 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [internalCategories, setInternalCategories] = useState<UiCategoryModel[]>(mockHomepageCategories)
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(true)
+  const [expandedParentIds, setExpandedParentIds] = useState<Set<string>>(new Set())
+  const [collapsedParentIds, setCollapsedParentIds] = useState<Set<string>>(new Set())
+
+  // Load backend categories if not supplied by parent
+  useEffect(() => {
+    if (categories && categories.length > 0) return
+    getUiCategories()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setInternalCategories(data)
+        }
+      })
+      .catch(() => {
+        // Retain mockHomepageCategories fallback
+      })
+  }, [categories])
+
+  const categoriesList = categories && categories.length > 0 ? categories : internalCategories
+
+  // Determine whether a parent category is expanded (user-expanded or contains the active subcategory)
+  const isCategoryExpanded = (cat: UiCategoryModel) => {
+    if (collapsedParentIds.has(cat.id)) return false
+    if (expandedParentIds.has(cat.id)) return true
+    return Boolean(cat.subcategories?.some((s) => s.id === selectedCategoryId))
+  }
+
+  const toggleCategoryExpanded = (cat: UiCategoryModel) => {
+    const isExpanded = isCategoryExpanded(cat)
+    if (isExpanded) {
+      setCollapsedParentIds((prev) => new Set([...prev, cat.id]))
+      setExpandedParentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(cat.id)
+        return next
+      })
+    } else {
+      setExpandedParentIds((prev) => new Set([...prev, cat.id]))
+      setCollapsedParentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(cat.id)
+        return next
+      })
+    }
+  }
+
+  const handleCategoryClick = (categoryId: string) => {
+    if (onCategorySelect) {
+      onCategorySelect(categoryId)
+    } else if (onNavigateProducts) {
+      onNavigateProducts(categoryId)
+    }
+    setIsMobileOpen(false)
+  }
 
   const browsingItems: NavItemDef[] = [
     {
@@ -83,8 +149,10 @@ export function AppSidebar({
       id: "products",
       label: "Products",
       icon: Package,
-      onClick: onNavigateProducts,
-      isActive: activeView === "products",
+      onClick: () => {
+        onNavigateProducts?.()
+      },
+      isActive: activeView === "products" && !selectedCategoryId,
     },
     {
       id: "search",
@@ -179,6 +247,155 @@ export function AppSidebar({
     )
   }
 
+  const renderCategoriesSection = (compact = false) => {
+    if (compact) {
+      return (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(false)}
+            title={
+              selectedCategoryId
+                ? `Categories (${categoriesList.find((c) => c.id === selectedCategoryId)?.name || "Filtered"})`
+                : "Categories"
+            }
+            className={cn(
+              "w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-150 cursor-pointer select-none",
+              activeView === "products" && Boolean(selectedCategoryId)
+                ? "bg-primary text-on-primary font-bold shadow-xs"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low font-medium"
+            )}
+          >
+            <Layers className="h-5 w-5 flex-shrink-0" />
+            <span className="sr-only">Categories</span>
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-1 pt-1">
+        {/* Collapsible Section Header */}
+        <button
+          type="button"
+          onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
+          className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer group"
+          aria-expanded={isCategoriesOpen}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <Layers className="h-4 w-4 flex-shrink-0 text-primary" />
+            <span className="text-label-md font-semibold text-on-surface truncate">Categories</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {categoriesList.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant leading-none">
+                {categoriesList.length}
+              </span>
+            )}
+            {isCategoriesOpen ? (
+              <ChevronDown className="h-3.5 w-3.5 text-outline group-hover:text-on-surface transition-transform" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-outline group-hover:text-on-surface transition-transform" />
+            )}
+          </div>
+        </button>
+
+        {/* Categories Vertical List (independently scrollable if long) */}
+        {isCategoriesOpen && (
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Category list"
+            className="pl-3 pr-1 space-y-0.5 max-h-56 overflow-y-auto no-scrollbar py-0.5"
+          >
+            {categoriesList.map((cat) => {
+              const isSelected = activeView === "products" && selectedCategoryId === cat.id
+              const hasSubcategories = Boolean(cat.subcategories && cat.subcategories.length > 0)
+              const isSubExpanded = isCategoryExpanded(cat)
+
+              return (
+                <div key={cat.id} className="space-y-0.5">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleCategoryClick(cat.id)}
+                      className={cn(
+                        "flex-1 flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer text-left select-none min-w-0",
+                        isSelected
+                          ? "bg-primary text-on-primary font-bold shadow-xs"
+                          : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low font-medium"
+                      )}
+                    >
+                      <span className="truncate">{cat.name}</span>
+                      {!hasSubcategories && (
+                        <ChevronRight
+                          className={cn(
+                            "h-3 w-3 flex-shrink-0 ml-1 transition-opacity",
+                            isSelected
+                              ? "text-on-primary opacity-90"
+                              : "text-outline/70 opacity-0 group-hover:opacity-100"
+                          )}
+                        />
+                      )}
+                    </button>
+
+                    {hasSubcategories && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleCategoryExpanded(cat)
+                        }}
+                        className="p-1 rounded-md text-outline hover:text-on-surface hover:bg-surface-container-low cursor-pointer flex-shrink-0"
+                        title={isSubExpanded ? "Collapse subcategories" : "Expand subcategories"}
+                        aria-label={
+                          isSubExpanded
+                            ? `Collapse ${cat.name} subcategories`
+                            : `Expand ${cat.name} subcategories`
+                        }
+                      >
+                        {isSubExpanded ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Nested Subcategories List */}
+                  {hasSubcategories && isSubExpanded && (
+                    <div className="pl-3 border-l border-surface-container space-y-0.5 ml-2 py-0.5">
+                      {cat.subcategories?.map((sub) => {
+                        const isSubSelected =
+                          activeView === "products" && selectedCategoryId === sub.id
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => handleCategoryClick(sub.id)}
+                            className={cn(
+                              "w-full flex items-center px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer text-left select-none",
+                              isSubSelected
+                                ? "bg-primary text-on-primary font-bold shadow-xs"
+                                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low font-medium"
+                            )}
+                          >
+                            <span className="truncate">{sub.name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Mobile Floating Menu Trigger (visible only on small screens) */}
@@ -228,6 +445,7 @@ export function AppSidebar({
                   Browse
                 </p>
                 {browsingItems.map((item) => renderNavButton(item))}
+                {renderCategoriesSection(false)}
               </div>
 
               <div className="space-y-1 border-t border-surface-container pt-3">
@@ -345,6 +563,7 @@ export function AppSidebar({
               </p>
             )}
             {browsingItems.map((item) => renderNavButton(item, isCollapsed))}
+            {renderCategoriesSection(isCollapsed)}
           </div>
 
           {/* Commerce Section */}

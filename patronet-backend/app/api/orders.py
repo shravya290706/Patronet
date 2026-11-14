@@ -109,11 +109,11 @@ def _order_response(order: Order) -> OrderResponse:
         items=item_responses,
         subtotal=subtotal,
         total_amount=Decimal(str(order.total_amount)),
-        razorpay_order_id=order.razorpay_order_id,
-        razorpay_payment_id=order.razorpay_payment_id,
-        gift_card_code=order.gift_card_code,
-        gift_card_amount=Decimal(str(order.gift_card_amount or "0.00")),
-        payable_amount=Decimal(str(order.payable_amount)) if order.payable_amount is not None else None,
+        razorpay_order_id=None,
+        razorpay_payment_id=None,
+        gift_card_code=None,
+        gift_card_amount=Decimal("0.00"),
+        payable_amount=Decimal(str(order.total_amount)),
         created_at=order.created_at,
     )
 
@@ -253,9 +253,6 @@ def _checkout(
             address_id=address.id,
             order_number=f"PAT-{uuid4().hex.upper()}",
             total_amount=subtotal,
-            payable_amount=payable,
-            gift_card_amount=gift_card_deduction,
-            gift_card_code=payload.gift_card_code,
             status="placed",
             payment_status=payment_status,
             payment_method=payment_method,
@@ -453,9 +450,6 @@ def initiate_checkout(
                 address_id=address.id,
                 order_number=order_number,
                 total_amount=subtotal,
-                payable_amount=Decimal("0.00"),
-                gift_card_code=applied_gift_card_code,
-                gift_card_amount=gift_card_amount,
                 status="placed",
                 payment_status="paid",
                 payment_method="gift_card",
@@ -552,10 +546,6 @@ def initiate_checkout(
                 address_id=address.id,
                 order_number=order_number,
                 total_amount=subtotal,
-                payable_amount=payable_amount,
-                gift_card_code=applied_gift_card_code,
-                gift_card_amount=gift_card_amount,
-                razorpay_order_id=rzp_order["id"],
                 status="pending_payment",
                 payment_status="pending",
                 payment_method="razorpay",
@@ -681,23 +671,10 @@ def verify_payment(
                 )
             inventory.available_stock -= item.quantity
 
-        # Deduct gift card if applicable
-        if order.gift_card_code and order.gift_card_amount and Decimal(str(order.gift_card_amount)) > Decimal("0.00"):
-            redeem_gift_card(
-                db=db,
-                code=order.gift_card_code,
-                order_id=order.id,
-                customer_id=customer.id,
-                amount_to_deduct=Decimal(str(order.gift_card_amount)),
-            )
-
         # Mark order placed and paid
         order.status = "placed"
         order.payment_status = "paid"
         order.payment_method = "razorpay"
-        order.razorpay_order_id = payload.razorpay_order_id
-        order.razorpay_payment_id = payload.razorpay_payment_id
-        order.razorpay_signature = payload.razorpay_signature
         order.updated_at = datetime.now(timezone.utc)
 
         # Prepare outbox event

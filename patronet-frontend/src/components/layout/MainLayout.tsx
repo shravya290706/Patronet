@@ -3,6 +3,7 @@ import { Header } from "./Header"
 import { Footer } from "./Footer"
 import { AppSidebar } from "./AppSidebar"
 import type { SearchSuggestionItem } from "@/mocks/search.mock"
+import type { UiCategoryModel } from "@/types/ui.types"
 import { cn } from "@/lib/utils"
 
 interface MainLayoutProps {
@@ -12,6 +13,8 @@ interface MainLayoutProps {
   onSearchSubmit?: (query: string) => void
   onSuggestionClick?: (suggestion: SearchSuggestionItem) => void
   onCategorySelect?: (categoryId: string) => void
+  selectedCategoryId?: string
+  categories?: UiCategoryModel[]
   onLocationClick?: () => void
   isAuthenticated?: boolean
   customerName?: string
@@ -38,6 +41,8 @@ export function MainLayout({
   onSearchSubmit,
   onSuggestionClick,
   onCategorySelect,
+  selectedCategoryId,
+  categories,
   onLocationClick,
   isAuthenticated,
   customerName,
@@ -76,6 +81,9 @@ export function MainLayout({
       <div className="flex-1 flex flex-row min-h-0 w-full relative">
         <AppSidebar
           activeView={activeView}
+          selectedCategoryId={selectedCategoryId}
+          categories={categories}
+          onCategorySelect={onCategorySelect}
           onNavigateHome={onNavigateHome}
           onNavigateProducts={onNavigateProducts}
           onNavigateSearch={onNavigateSearch}

@@ -28,10 +28,26 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def _unauthorized() -> HTTPException:
+def _invalid_credentials() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid email or password.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _authentication_required() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required. Please sign in.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _session_expired() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Your session has expired. Please sign in again.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -89,7 +105,7 @@ def login_customer(
     if customer is None or not verify_password(
         payload.password, customer.password_hash
     ):
-        raise _unauthorized()
+        raise _invalid_credentials()
 
     expires_in = settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
     if expires_in <= 0:
@@ -104,7 +120,7 @@ def get_current_customer(
     db: Session = Depends(get_db),  # noqa: B008
 ) -> Customer:
     if credentials is None:
-        raise _unauthorized()
+        raise _authentication_required()
 
     try:
         claims = decode_access_token(credentials.credentials)
@@ -113,11 +129,11 @@ def get_current_customer(
             raise TypeError("Token subject must be a UUID string.")
         customer_id = UUID(subject)
     except (jwt.InvalidTokenError, ValueError, TypeError) as error:
-        raise _unauthorized() from error
+        raise _session_expired() from error
 
     customer = db.get(Customer, customer_id)
     if customer is None:
-        raise _unauthorized()
+        raise _authentication_required()
     return customer
 
 

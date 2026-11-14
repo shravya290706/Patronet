@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import {
   AlertCircle,
   CheckCircle2,
+  LogIn,
   MapPin,
   PackageCheck,
   ShieldAlert,
@@ -126,12 +127,14 @@ export function OrdersPage({ orderId, onBrowse }: OrdersPageProps) {
   const [productNames, setProductNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isUnauthenticated, setIsUnauthenticated] = useState(false)
 
   useEffect(() => {
     let active = true
     async function load() {
       setLoading(true)
       setError(null)
+      setIsUnauthenticated(false)
       try {
         if (orderId) {
           const order = await getOrder(orderId)
@@ -153,7 +156,14 @@ export function OrdersPage({ orderId, onBrowse }: OrdersPageProps) {
           if (active) setOrders(response.results)
         }
       } catch (rawError) {
-        if (active) setError(normalizeApiError(rawError).message)
+        if (active) {
+          const apiError = normalizeApiError(rawError)
+          if (apiError.isUnauthorized) {
+            setIsUnauthenticated(true)
+          } else {
+            setError(apiError.message)
+          }
+        }
       } finally {
         if (active) setLoading(false)
       }
@@ -170,6 +180,31 @@ export function OrdersPage({ orderId, onBrowse }: OrdersPageProps) {
       <Container className="py-space-xl">
         {loading ? (
           <p role="status" className="py-space-xl text-center text-on-surface-variant">Loading order…</p>
+        ) : isUnauthenticated ? (
+          <div className="rounded-2xl border border-surface-container bg-surface-container-lowest p-space-xl text-center max-w-lg mx-auto shadow-xs">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-space-sm">
+              <LogIn className="h-6 w-6" />
+            </div>
+            <h2 className="font-title-lg text-title-lg font-bold text-on-surface">Sign in to view this order</h2>
+            <p className="text-body-md text-on-surface-variant mt-2 max-w-sm mx-auto">
+              Please sign in to your PATRONET account to view this order and its delivery tracking.
+            </p>
+            <div className="mt-space-md flex flex-col sm:flex-row items-center justify-center gap-3">
+              <a
+                href="#login"
+                className="w-full sm:w-auto rounded-xl bg-primary px-space-lg py-2.5 text-on-primary font-label-md font-bold shadow-xs hover:bg-primary/90 transition-colors text-center cursor-pointer"
+              >
+                Sign In
+              </a>
+              <button
+                type="button"
+                onClick={onBrowse}
+                className="w-full sm:w-auto rounded-xl border border-surface-container px-space-md py-2.5 text-on-surface font-label-md font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
+              >
+                Continue Browsing
+              </button>
+            </div>
+          </div>
         ) : error ? (
           <div role="alert" className="rounded-lg bg-error-container p-space-md text-error flex items-center gap-2">
             <AlertCircle className="h-5 w-5 shrink-0" />
@@ -323,6 +358,31 @@ export function OrdersPage({ orderId, onBrowse }: OrdersPageProps) {
 
       {loading ? (
         <p role="status" className="py-space-xl text-center text-on-surface-variant">Loading orders…</p>
+      ) : isUnauthenticated ? (
+        <div className="rounded-2xl border border-surface-container bg-surface-container-lowest p-space-xl text-center max-w-lg mx-auto shadow-xs my-space-md">
+          <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-space-sm">
+            <LogIn className="h-6 w-6" />
+          </div>
+          <h2 className="font-title-lg text-title-lg font-bold text-on-surface">Sign in to view your orders</h2>
+          <p className="text-body-md text-on-surface-variant mt-2 max-w-sm mx-auto">
+            Please sign in to your PATRONET account to view your past orders, delivery tracking, and payment receipts.
+          </p>
+          <div className="mt-space-md flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href="#login"
+              className="w-full sm:w-auto rounded-xl bg-primary px-space-lg py-2.5 text-on-primary font-label-md font-bold shadow-xs hover:bg-primary/90 transition-colors text-center cursor-pointer"
+            >
+              Sign In
+            </a>
+            <button
+              type="button"
+              onClick={onBrowse}
+              className="w-full sm:w-auto rounded-xl border border-surface-container px-space-md py-2.5 text-on-surface font-label-md font-semibold hover:bg-surface-container-low transition-colors cursor-pointer"
+            >
+              Continue Browsing
+            </button>
+          </div>
+        </div>
       ) : orders.length ? (
         <div className="space-y-space-sm">
           {orders.map((order) => (

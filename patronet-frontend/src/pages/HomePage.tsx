@@ -2,7 +2,6 @@ import { useState, useEffect } from "react"
 import { ArrowRight, Mail } from "lucide-react"
 import { Container } from "@/components/layout/Container"
 import { HeroSection } from "@/components/layout/HeroSection"
-import { CategoryAsideNav } from "@/components/layout/CategoryAsideNav"
 import { CategoryCard } from "@/components/ui/category-card"
 import { PromoBanner } from "@/components/ui/promo-banner"
 import { SectionHeading } from "@/components/ui/section-heading"
@@ -78,26 +77,13 @@ export function HomePage({
   }
 
   return (
-    <div className="py-space-md sm:py-space-lg space-y-space-xl">
-      {/* SECTION 1: HERO & CATEGORY NAVIGATOR GRID (12 Columns) */}
+    <div className="py-space-sm sm:py-space-md space-y-space-lg sm:space-y-space-xl">
+      {/* SECTION 1: HERO BANNER & VALUE PROPOSITIONS */}
       <Container>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
-          {/* Left Column: Category Navigator Aside (4 cols on lg) */}
-          <div className="lg:col-span-4 w-full">
-            <CategoryAsideNav
-              categories={categories}
-              onCategorySelect={onCategoryClick}
-            />
-          </div>
-
-          {/* Right Column: Hero Banner Carousel (8 cols on lg) */}
-          <div className="lg:col-span-8 w-full">
-            <HeroSection
-              onPrimaryClick={(id) => onCategoryClick?.(id)}
-              onSecondaryClick={(id) => onCategoryClick?.(id)}
-            />
-          </div>
-        </div>
+        <HeroSection
+          onPrimaryClick={(id) => onCategoryClick?.(id)}
+          onSecondaryClick={(id) => onCategoryClick?.(id)}
+        />
       </Container>
 
       {/* SECTION 2: POPULAR CATEGORIES */}

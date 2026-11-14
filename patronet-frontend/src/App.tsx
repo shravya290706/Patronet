@@ -42,6 +42,12 @@ function isProtectedView(view: ViewMode): boolean {
   return ["cart", "wishlist", "addresses", "checkout", "orders", "order-details"].includes(view)
 }
 
+function isCategoryTarget(id?: string): id is string {
+  if (!id) return false
+  if (id.startsWith("cat-")) return true
+  return isBackendUuid(id)
+}
+
 function parseHash(): RouteState {
   const hash = window.location.hash
   if (hash === "#cart") return { view: "cart" }
@@ -87,7 +93,7 @@ function parseHash(): RouteState {
     const sort = params.get("sort")
     return {
       view: "products",
-      param: isBackendUuid(categoryId) ? categoryId : undefined,
+      param: isCategoryTarget(categoryId) ? categoryId : undefined,
       sort: sort === "price_asc" || sort === "price_desc" ? sort : "newest",
     }
   }
@@ -106,6 +112,7 @@ function App() {
   const [cartSubtotal, setCartSubtotal] = useState(0)
   const [wishlistProductIds, setWishlistProductIds] = useState<ReadonlySet<string>>(new Set())
   const [accountError, setAccountError] = useState<string | null>(null)
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingPostLoginAction | null>(null)
   const [pendingRoute, setPendingRoute] = useState<string | null>(() => {
     const initialRoute = parseHash()
@@ -143,7 +150,13 @@ function App() {
       setCartSubtotal(Number(cart.subtotal || "0"))
       setWishlistProductIds(new Set(wishlist.items.map((item) => item.product.id)))
     } catch (error) {
-      setAccountError(normalizeApiError(error).message)
+      const normalized = normalizeApiError(error)
+      // Suppress raw error banner for standard unauthenticated states; retain for real server issues
+      if (!normalized.isUnauthorized) {
+        setAccountError(normalized.message)
+      } else {
+        setAccountError(null)
+      }
     }
   }, [])
 
@@ -176,7 +189,12 @@ function App() {
 
   useEffect(() => {
     const handleExpiredSession = () => {
-      setCustomer(null)
+      setCustomer((prev) => {
+        if (prev) {
+          setSessionExpiredNotice(true)
+        }
+        return null
+      })
       setCartCount(0)
       setWishlistProductIds(new Set())
       if (isProtectedView(parseHash().view)) {
@@ -200,14 +218,14 @@ function App() {
     sort: RouteState["sort"] = "newest"
   ) => {
     const params = new URLSearchParams()
-    if (isBackendUuid(categoryId)) params.set("category", categoryId)
+    if (isCategoryTarget(categoryId)) params.set("category", categoryId)
     if (sort && sort !== "newest") params.set("sort", sort)
     const query = params.toString()
     const newHash = query ? `#products?${query}` : "#products"
     window.location.hash = newHash
     setRouteState({
       view: "products",
-      param: isBackendUuid(categoryId) ? categoryId : undefined,
+      param: isCategoryTarget(categoryId) ? categoryId : undefined,
       sort,
     })
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -260,6 +278,7 @@ function App() {
   }
 
   const handleLoginSuccess = async () => {
+    setSessionExpiredNotice(false)
     await refreshAccountData()
     if (pendingAction) {
       try {
@@ -356,11 +375,12 @@ function App() {
       )}
 
       <MainLayout
+        selectedCategoryId={routeState.view === "products" ? routeState.param : undefined}
         onSearchSubmit={navigateToSearch}
         onSuggestionClick={handleSuggestionSelect}
         onCategorySelect={(category) => {
-          if (category === "all" || isBackendUuid(category)) {
-            navigateToProducts(isBackendUuid(category) ? category : undefined)
+          if (category === "all" || isCategoryTarget(category)) {
+            navigateToProducts(category === "all" ? undefined : category)
           } else if (category === "deals" || category === "offers") {
             navigateToSearch(category)
           } else if (category === "new-arrivals") {
@@ -387,9 +407,32 @@ function App() {
         onNavigateLogin={navigateToLogin}
         onNavigateRegister={navigateToRegister}
       >
+      {sessionExpiredNotice && (
+        <div role="status" className="bg-amber-50 border-b border-amber-200 px-gutter py-2 text-center text-body-sm text-amber-900 flex items-center justify-center gap-3">
+          <span>Your session has expired. Please sign in to continue.</span>
+          <button
+            type="button"
+            onClick={() => {
+              setSessionExpiredNotice(false)
+              navigateToLogin()
+            }}
+            className="rounded-md bg-amber-800 text-white px-2.5 py-0.5 text-xs font-bold hover:bg-amber-900 transition-colors cursor-pointer"
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => setSessionExpiredNotice(false)}
+            className="text-amber-700 hover:text-amber-900 text-xs font-semibold underline cursor-pointer ml-1"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {accountError && (
         <div role="alert" className="bg-error-container px-gutter py-2 text-center text-body-sm text-error">
-          Account data could not be refreshed: {accountError}
+          Server connection issue: {accountError}
         </div>
       )}
 
