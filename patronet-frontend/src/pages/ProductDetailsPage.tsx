@@ -8,7 +8,10 @@ import {
   Check,
   ChevronRight,
   RotateCcw,
+  Scale,
+  Handshake,
 } from "lucide-react"
+import { useSmartShopping } from "@/components/smart-shopping"
 
 import { Container } from "@/components/layout"
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui"
@@ -61,6 +64,8 @@ export function ProductDetailsPage({
   const [pincodeInput, setPincodeInput] = useState<string>("")
   const [pincodeFeedback, setPincodeFeedback] = useState<string | null>(null)
   const [relatedProducts, setRelatedProducts] = useState<UiProductCardModel[]>([])
+
+  const { addToCompare, isCompared, startNegotiationForProduct } = useSmartShopping()
 
   // Fetch product detail
   useEffect(() => {
@@ -463,6 +468,42 @@ export function ProductDetailsPage({
                           isWishlisted ? "fill-current text-white" : "text-outline"
                         }`}
                       />
+                    </button>
+                  </div>
+
+                  {/* Smart Shopping Action Buttons: Compare Buddy & Negotiator */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => product && addToCompare(product)}
+                      aria-label={product && isCompared(product.id) ? "Remove from Compare Buddy" : "Add to Compare Buddy"}
+                      className={`h-12 rounded-xl font-label-md text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all border cursor-pointer shadow-xs ${
+                        product && isCompared(product.id)
+                          ? "bg-primary text-on-primary border-primary ring-2 ring-primary/30"
+                          : "bg-surface-container-low hover:bg-surface-container-high text-on-surface border-surface-container hover:border-primary/40"
+                      }`}
+                    >
+                      {product && isCompared(product.id) ? (
+                        <>
+                          <Check className="w-4 h-4 stroke-[2.5]" />
+                          <span>In Compare Buddy (Click to Remove)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Scale className="w-4 h-4" />
+                          <span>Add to Compare Buddy (Up to 4)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => product && startNegotiationForProduct(product)}
+                      aria-label="Open Negotiator to bargain price with seller"
+                      className="h-12 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-950 border border-amber-300 font-label-md text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                      <Handshake className="w-4.5 h-4.5 text-amber-800" />
+                      <span>Negotiate Price / Bargain</span>
                     </button>
                   </div>
 

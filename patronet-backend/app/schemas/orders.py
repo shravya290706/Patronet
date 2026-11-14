@@ -10,6 +10,9 @@ class CheckoutRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     address_id: UUID
+    payment_method: str | None = None
+    gift_card_code: str | None = None
+    gift_card_amount: Decimal | None = None
 
 
 class OrderAddressSnapshot(BaseModel):
@@ -41,6 +44,11 @@ class OrderResponse(BaseModel):
     items: list[OrderItemResponse]
     subtotal: Decimal
     total_amount: Decimal
+    razorpay_order_id: str | None = None
+    razorpay_payment_id: str | None = None
+    gift_card_code: str | None = None
+    gift_card_amount: Decimal = Decimal("0.00")
+    payable_amount: Decimal | None = None
     created_at: datetime
 
 

@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from "react"
 import { MainLayout, BrandIntro } from "@/components/layout"
+import {
+  SmartShoppingProvider,
+  SmartShoppingDock,
+  CompareBuddyDrawer,
+  ShoppingBuddyDrawer,
+  NegotiatorDrawer,
+} from "@/components/smart-shopping"
 import { HomePage } from "@/pages/HomePage"
 import { ProductListingPage } from "@/pages/ProductListingPage"
 import { ProductDetailsPage } from "@/pages/ProductDetailsPage"
@@ -96,6 +103,7 @@ function App() {
   })
   const [customer, setCustomer] = useState<ApiCustomerProfile | null>(null)
   const [cartCount, setCartCount] = useState(0)
+  const [cartSubtotal, setCartSubtotal] = useState(0)
   const [wishlistProductIds, setWishlistProductIds] = useState<ReadonlySet<string>>(new Set())
   const [accountError, setAccountError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingPostLoginAction | null>(null)
@@ -120,6 +128,7 @@ function App() {
       setCustomer(profile)
       if (!profile) {
         setCartCount(0)
+        setCartSubtotal(0)
         setWishlistProductIds(new Set())
         const currentRoute = parseHash()
         if (isProtectedView(currentRoute.view)) {
@@ -131,6 +140,7 @@ function App() {
       }
       const [cart, wishlist] = await Promise.all([getCart(), getWishlist()])
       setCartCount(cart.total_quantity)
+      setCartSubtotal(Number(cart.subtotal || "0"))
       setWishlistProductIds(new Set(wishlist.items.map((item) => item.product.id)))
     } catch (error) {
       setAccountError(normalizeApiError(error).message)
@@ -335,7 +345,12 @@ function App() {
   }
 
   return (
-    <>
+    <SmartShoppingProvider
+      onNavigateProduct={navigateToProductDetails}
+      onAddToCart={handleAddToCart}
+      cartSubtotal={cartSubtotal}
+      cartItemCount={cartCount}
+    >
       {showBrandIntro && (
         <BrandIntro onComplete={handleIntroComplete} />
       )}
@@ -360,84 +375,21 @@ function App() {
         cartCount={cartCount}
         wishlistCount={wishlistProductIds.size}
         onLogout={handleLogout}
+        activeView={routeState.view}
+        onNavigateHome={navigateToHome}
+        onNavigateProducts={() => navigateToProducts()}
+        onNavigateSearch={() => navigateToSearch("")}
+        onNavigateCart={() => navigateToProtected("#cart", "cart")}
+        onNavigateWishlist={() => navigateToProtected("#wishlist", "wishlist")}
+        onNavigateOrders={() => navigateToProtected("#orders", "orders")}
+        onNavigateAddresses={() => navigateToProtected("#addresses", "addresses")}
+        onNavigateCheckout={() => navigateToProtected("#checkout", "checkout")}
+        onNavigateLogin={navigateToLogin}
+        onNavigateRegister={navigateToRegister}
       >
       {accountError && (
         <div role="alert" className="bg-error-container px-gutter py-2 text-center text-body-sm text-error">
           Account data could not be refreshed: {accountError}
-        </div>
-      )}
-      {/* Top Demo Bar for Testing All Navigation States (Dev Only) */}
-      {import.meta.env.DEV && (
-        <div className="bg-primary-container/10 border-b border-primary/10 py-1.5 px-4 text-center">
-          <div className="inline-flex items-center gap-2 text-label-sm font-label-sm text-on-surface-variant flex-wrap justify-center">
-            <span>Active View:</span>
-            <button
-              type="button"
-              onClick={navigateToHome}
-              className={`px-2.5 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
-                routeState.view === "home"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "bg-surface-container hover:bg-surface-variant text-on-surface"
-              }`}
-            >
-              Homepage
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateToProducts()}
-              className={`px-2.5 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
-                routeState.view === "products"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "bg-surface-container hover:bg-surface-variant text-on-surface"
-              }`}
-            >
-              Product Listing (PLP)
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateToProductDetails(routeState.param || "")}
-              className={`px-2.5 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
-                routeState.view === "product-details"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "bg-surface-container hover:bg-surface-variant text-on-surface"
-              }`}
-            >
-              Product Details (PDP)
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateToSearch("headphones")}
-              className={`px-2.5 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
-                routeState.view === "search"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "bg-surface-container hover:bg-surface-variant text-on-surface"
-              }`}
-            >
-              Search Results
-            </button>
-            <button
-              type="button"
-              onClick={navigateToLogin}
-              className={`px-2.5 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
-                routeState.view === "login"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "bg-surface-container hover:bg-surface-variant text-on-surface"
-              }`}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={navigateToRegister}
-              className={`px-2.5 py-0.5 rounded-full font-bold transition-colors cursor-pointer ${
-                routeState.view === "register"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "bg-surface-container hover:bg-surface-variant text-on-surface"
-              }`}
-            >
-              Register
-            </button>
-          </div>
         </div>
       )}
 
@@ -516,9 +468,12 @@ function App() {
           onManageAddresses={() => navigateToProtected("#addresses", "addresses")}
           onBrowse={() => navigateToProducts()}
           onOrderPlaced={(order: ApiOrderResponse) => {
-            setCartCount(0)
-            void refreshAccountData()
-            navigateToRoute(`#order/${encodeURIComponent(order.id)}`, "order-details", order.id)
+            // For real backend orders only: clear cart count and navigate to saved order details
+            if (!order.id.startsWith("demo-")) {
+              setCartCount(0)
+              void refreshAccountData()
+              navigateToRoute(`#order/${encodeURIComponent(order.id)}`, "order-details", order.id)
+            }
           }}
         />
       )}
@@ -564,7 +519,13 @@ function App() {
         />
       )}
     </MainLayout>
-    </>
+
+    {/* Floating Smart Shopping Assistants */}
+    <SmartShoppingDock />
+    <CompareBuddyDrawer />
+    <ShoppingBuddyDrawer />
+    <NegotiatorDrawer />
+  </SmartShoppingProvider>
   )
 }
 

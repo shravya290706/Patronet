@@ -22,6 +22,14 @@ class Order(Base):
     payment_status: Mapped[str] = mapped_column(String(30), nullable=False)
     payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
+    # Razorpay and Gift Card payment tracking
+    razorpay_order_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    razorpay_payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    razorpay_signature: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    gift_card_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gift_card_amount: Mapped[object] = mapped_column(Numeric(12, 2), default=0, nullable=False, server_default="0.00")
+    payable_amount: Mapped[object | None] = mapped_column(Numeric(12, 2), nullable=True)
+
     # Address snapshot — preserves delivery details even if address is later changed/deleted
     snapshot_full_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     snapshot_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)

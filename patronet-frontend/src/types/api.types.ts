@@ -208,6 +208,9 @@ export type ApiAddressUpdate = Partial<ApiAddressCreate>
 /** POST /api/orders/checkout request body */
 export interface ApiCheckoutRequest {
   address_id: string
+  payment_method?: string | null
+  gift_card_code?: string | null
+  gift_card_amount?: number | string | null
 }
 
 export interface ApiOrderAddressSnapshot {
@@ -239,6 +242,11 @@ export interface ApiOrderResponse {
   items: ApiOrderItem[]
   subtotal: string
   total_amount: string
+  razorpay_order_id?: string | null
+  razorpay_payment_id?: string | null
+  gift_card_code?: string | null
+  gift_card_amount?: string | null
+  payable_amount?: string | null
   created_at: string
 }
 
@@ -247,4 +255,71 @@ export interface ApiPaginatedOrders {
   page: number
   page_size: number
   results: ApiOrderResponse[]
+}
+
+// ── Payments & Gift Cards ─────────────────────────────────────────────────────
+
+export interface ApiPaymentConfig {
+  razorpay_key_id: string
+  mode: "test" | "mock"
+  is_test_mode: boolean
+  currency: string
+}
+
+export interface ApiInitiateCheckoutRequest {
+  address_id: string
+  gift_card_code?: string | null
+}
+
+export interface ApiInitiateCheckoutResponse {
+  order_id: string
+  order_number: string
+  subtotal: string
+  gift_card_code: string | null
+  gift_card_amount: string
+  payable_amount: string
+  razorpay_order_id: string | null
+  currency: string
+  key_id: string
+  mode: "test" | "mock"
+  status: "pending_payment" | "placed"
+}
+
+export interface ApiVerifyPaymentRequest {
+  order_id: string
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  razorpay_signature: string
+}
+
+export interface ApiCancelPaymentRequest {
+  order_id: string
+  reason?: string | null
+}
+
+export interface ApiCancelPaymentResponse {
+  order_id: string
+  status: string
+  payment_status: string
+  message: string
+}
+
+export interface ApiGiftCardValidateRequest {
+  code: string
+  cart_subtotal?: number | string | null
+}
+
+export interface ApiGiftCardValidateResponse {
+  valid: boolean
+  code: string
+  current_balance: string
+  applicable_amount: string
+  description?: string | null
+  message: string
+}
+
+export interface ApiDemoGiftCard {
+  code: string
+  balance: string
+  description: string
 }

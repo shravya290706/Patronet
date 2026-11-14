@@ -31,15 +31,24 @@ if (!configuredBaseUrl) {
  * Throws an explicit configuration error if missing in production or when an API call is attempted.
  */
 export function getApiBaseUrl(): string {
-  if (!configuredBaseUrl) {
-    throw new ApiError(
-      0,
-      "CONFIG_ERROR",
-      "VITE_API_BASE_URL environment variable is missing. " +
-      "Please configure VITE_API_BASE_URL in your environment (e.g. .env.local) to point to the backend API."
-    )
+  if (configuredBaseUrl) {
+    const trimmed = configuredBaseUrl.replace(/\/+$/, "")
+    if (import.meta.env.DEV && trimmed.startsWith("http://localhost:")) {
+      return trimmed.replace("http://localhost:", "http://127.0.0.1:")
+    }
+    return trimmed
   }
-  return configuredBaseUrl.replace(/\/+$/, "")
+
+  if (import.meta.env.DEV) {
+    return "http://127.0.0.1:8000"
+  }
+
+  throw new ApiError(
+    0,
+    "CONFIG_ERROR",
+    "VITE_API_BASE_URL environment variable is missing. " +
+    "Please configure VITE_API_BASE_URL in your environment (e.g. .env.local) to point to the backend API."
+  )
 }
 
 export interface RequestOptions extends RequestInit {

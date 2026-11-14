@@ -84,5 +84,11 @@ class Settings:
         os.getenv("OPENSEARCH_USE_SSL", "true").lower() == "true"
     )
 
+    # Razorpay (Test Mode & Free Mock Mode for Local Development)
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+
 
 settings = Settings()

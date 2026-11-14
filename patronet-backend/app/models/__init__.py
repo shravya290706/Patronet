@@ -3,6 +3,7 @@ from app.models.cart import Cart
 from app.models.cart_item import CartItem
 from app.models.category import Category
 from app.models.customer import Customer
+from app.models.gift_card import GiftCard, GiftCardRedemption
 from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.order_item import OrderItem
@@ -18,6 +19,8 @@ __all__ = [
     "CartItem",
     "Category",
     "Customer",
+    "GiftCard",
+    "GiftCardRedemption",
     "Inventory",
     "Order",
     "OrderItem",

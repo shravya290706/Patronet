@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { Header } from "./Header"
 import { Footer } from "./Footer"
+import { AppSidebar } from "./AppSidebar"
 import type { SearchSuggestionItem } from "@/mocks/search.mock"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +18,17 @@ interface MainLayoutProps {
   cartCount?: number
   wishlistCount?: number
   onLogout?: () => void
+  activeView?: string
+  onNavigateHome?: () => void
+  onNavigateProducts?: () => void
+  onNavigateSearch?: () => void
+  onNavigateCart?: () => void
+  onNavigateWishlist?: () => void
+  onNavigateOrders?: () => void
+  onNavigateAddresses?: () => void
+  onNavigateCheckout?: () => void
+  onNavigateLogin?: () => void
+  onNavigateRegister?: () => void
 }
 
 export function MainLayout({
@@ -32,6 +44,17 @@ export function MainLayout({
   cartCount,
   wishlistCount,
   onLogout,
+  activeView,
+  onNavigateHome,
+  onNavigateProducts,
+  onNavigateSearch,
+  onNavigateCart,
+  onNavigateWishlist,
+  onNavigateOrders,
+  onNavigateAddresses,
+  onNavigateCheckout,
+  onNavigateLogin,
+  onNavigateRegister,
 }: MainLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col bg-surface text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
@@ -49,10 +72,31 @@ export function MainLayout({
         onLogout={onLogout}
       />
 
-      {/* Main Content Area */}
-      <main className={cn("flex-1", className)}>
-        {children}
-      </main>
+      {/* Persistent Body: Sidebar on the left + Main Page Content on the right */}
+      <div className="flex-1 flex flex-row min-h-0 w-full relative">
+        <AppSidebar
+          activeView={activeView}
+          onNavigateHome={onNavigateHome}
+          onNavigateProducts={onNavigateProducts}
+          onNavigateSearch={onNavigateSearch}
+          onNavigateCart={onNavigateCart}
+          onNavigateWishlist={onNavigateWishlist}
+          onNavigateOrders={onNavigateOrders}
+          onNavigateAddresses={onNavigateAddresses}
+          onNavigateCheckout={onNavigateCheckout}
+          onNavigateLogin={onNavigateLogin}
+          onNavigateRegister={onNavigateRegister}
+          cartCount={cartCount}
+          wishlistCount={wishlistCount}
+          isAuthenticated={isAuthenticated}
+          customerName={customerName}
+          onLogout={onLogout}
+        />
+
+        <main className={cn("flex-1 min-w-0 flex flex-col", className)}>
+          {children}
+        </main>
+      </div>
 
       {/* Shared Marketplace Footer */}
       <Footer />

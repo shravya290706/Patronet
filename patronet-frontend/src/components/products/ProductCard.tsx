@@ -1,8 +1,9 @@
 import { useState } from "react"
-import { Eye, Heart, Plus } from "lucide-react"
+import { Check, Eye, Heart, Plus, Scale } from "lucide-react"
 import type { UiProductCardModel } from "@/types/ui.types"
 import { cn } from "@/lib/utils"
 import { normalizeApiError } from "@/services/api.errors"
+import { useSmartShopping } from "@/components/smart-shopping"
 
 export type ProductCardData = UiProductCardModel
 
@@ -26,6 +27,9 @@ export function ProductCard({
   const [isAdding, setIsAdding] = useState(false)
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
+
+  const { addToCompare, isCompared } = useSmartShopping()
+  const isItemCompared = isCompared(product.id)
 
   // Format price in Indian numbering system
   const formattedPrice = new Intl.NumberFormat("en-IN", {
@@ -71,6 +75,37 @@ export function ProductCard({
       <div>
         {/* Product Image Viewport */}
         <div className="relative w-full aspect-square bg-surface-container-low rounded-lg overflow-hidden mb-space-sm flex items-center justify-center">
+          {/* Compare Buddy Quick Toggle */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              addToCompare(product)
+            }}
+            aria-label={isItemCompared ? "Remove from Compare Buddy" : "Add to Compare Buddy"}
+            aria-pressed={isItemCompared}
+            title={isItemCompared ? "Click to remove from Compare Buddy" : "Click to compare up to 4 items"}
+            className={cn(
+              "absolute top-2 left-2 z-20 h-7.5 rounded-lg px-2.5 py-1 text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer select-none",
+              isItemCompared
+                ? "bg-primary text-on-primary ring-2 ring-primary/40 shadow-md"
+                : "bg-surface-container-lowest/95 text-on-surface hover:text-primary hover:bg-surface-container-lowest border border-surface-container-high/80"
+            )}
+          >
+            {isItemCompared ? (
+              <>
+                <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                <span>Compared</span>
+              </>
+            ) : (
+              <>
+                <Scale className="h-3.5 w-3.5" />
+                <span>+ Compare</span>
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => onViewDetails?.(product.id)}

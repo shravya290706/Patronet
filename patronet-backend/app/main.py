@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.addresses import router as addresses_router
 from app.api.auth import router as auth_router
 from app.api.cart import router as cart_router
+from app.api.gift_cards import router as gift_cards_router
 from app.api.orders import router as orders_router
+from app.api.payments import router as payments_router
 from app.api.products import router as products_router
 from app.api.wishlist import router as wishlist_router
 
@@ -46,6 +48,8 @@ app.include_router(auth_router)
 app.include_router(addresses_router)
 app.include_router(cart_router)
 app.include_router(orders_router)
+app.include_router(payments_router)
+app.include_router(gift_cards_router)
 app.include_router(wishlist_router)
 
 
